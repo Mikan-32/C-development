@@ -1,0 +1,24 @@
+[submodule "third_party/SDL"]
+	path = third_party/SDL
+	url = https://github.com/libsdl-org/SDL.git
+	shallow = true
+[submodule "third_party/lvgl"]
+	path = third_party/lvgl
+	url = https://github.com/lvgl/lvgl.git
+	shallow = true
+[submodule "third_party/sqlcipher"]
+	path = third_party/sqlcipher
+	url = https://github.com/sqlcipher/sqlcipher.git
+	shallow = true
+[submodule "third_party/curl"]
+	path = third_party/curl
+	url = https://github.com/curl/curl.git
+	shallow = true
+[submodule "third_party/cJSON"]
+	path = third_party/cJSON
+	url = https://github.com/DaveGamble/cJSON.git
+	shallow = true
+[submodule "third_party/Unity"]
+	path = third_party/Unity
+	url = https://github.com/ThrowTheSwitch/Unity.git
+	shallow = true
