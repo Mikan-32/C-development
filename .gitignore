@@ -1,0 +1,38 @@
+# ビルド成果物
+/build/
+/out/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
+*.pdb
+compile_commands.json
+
+# エディタ・OS
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.iml
+.cache/
+.DS_Store
+Thumbs.db
+
+# Android（Gradle）
+.gradle/
+local.properties
+android/**/build/
+.cxx/
+.externalNativeBuild/
+captures/
+
+# 秘密情報（絶対にコミットしない）
+*.jks
+*.keystore
+*.p12
+*.pem
+.env
+secrets.*

@@ -1,0 +1,27 @@
+# 静的解析の設定（clang-tidy）。最初は警告として出し、慣れてきたらエラー扱いを増やす
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  cert-*,
+  clang-analyzer-*,
+  misc-*,
+  -misc-include-cleaner,
+  performance-*,
+  portability-*,
+  readability-*,
+  -readability-identifier-length,
+  -readability-magic-numbers
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*/(src|platform|tests)/.*'
+FormatStyle: file
+CheckOptions:
+  readability-identifier-naming.GlobalFunctionCase: lower_case
+  readability-identifier-naming.GlobalFunctionPrefix: nk_
+  readability-identifier-naming.VariableCase: lower_case
+  readability-identifier-naming.ParameterCase: lower_case
+  readability-identifier-naming.StructCase: lower_case
+  readability-identifier-naming.TypedefCase: lower_case
+  readability-identifier-naming.EnumConstantCase: UPPER_CASE
+  readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  readability-function-cognitive-complexity.Threshold: 30
