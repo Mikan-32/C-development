@@ -1,0 +1,76 @@
+# CI：PR ごとと main への統合時に実行する
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux（整形チェック・ビルド・テスト・サニタイザー）
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          lfs: true
+      - name: ツールを入れる（mise.toml の版）
+        uses: jdx/mise-action@v5
+      - name: clang とサニタイザーのランタイムを入れる
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-rt-18-dev
+      - name: 整形チェック（clang-format）
+        run: git ls-files '*.c' '*.h' ':!:third_party/**' | xargs -r clang-format --dry-run --Werror
+      - name: 構成
+        run: cmake --preset linux-sanitize
+      - name: ビルド
+        run: cmake --build --preset linux-sanitize
+      - name: テスト（ASan＋UBSan）
+        run: ctest --preset linux-sanitize
+
+  windows:
+    name: Windows（clang-cl でビルド・テスト）
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: Visual Studio の開発者環境を読み込む
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: 構成
+        run: cmake --preset windows-clang -DNK_WARNINGS_AS_ERRORS=ON
+      - name: ビルド
+        run: cmake --build --preset windows-clang
+      - name: テスト
+        run: ctest --preset windows-clang
+
+  android-native:
+    name: Android（C 部分のビルド確認・NDK r28 以降）
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - name: ツールを入れる（mise.toml の版）
+        uses: jdx/mise-action@v5
+      - name: NDK の場所と版を確認する
+        run: |
+          ndk="$ANDROID_NDK_LATEST_HOME"
+          rev=$(grep 'Pkg.Revision' "$ndk/source.properties" | sed 's/.*= *//')
+          echo "NDK: $ndk ($rev)"
+          if [ "${rev%%.*}" -lt 28 ]; then
+            echo "NDK r28 以降が必要です（16KB ページサイズ対応のため）"
+            exit 1
+          fi
+          echo "ANDROID_NDK=$ndk" >> "$GITHUB_ENV"
+      - name: 構成
+        run: cmake --preset android-arm64
+      - name: ビルド
+        run: cmake --build --preset android-arm64

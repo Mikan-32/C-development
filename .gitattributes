@@ -1,0 +1,19 @@
+# 改行コードを LF に統一する（Windows と WSL2・CI の差をなくすため）
+* text=auto eol=lf
+
+# Windows 専用のスクリプトだけは CRLF にする
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# バイナリファイル
+*.png binary
+*.jpg binary
+*.pdf binary
+*.ttf binary
+*.otf binary
+*.wav binary
+*.jar binary
+
+# テストデータ（録音・センサーログ）は Git LFS で管理する
+tests/data/**/*.wav filter=lfs diff=lfs merge=lfs -text
+tests/data/**/*.csv filter=lfs diff=lfs merge=lfs -text

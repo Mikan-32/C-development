@@ -1,0 +1,13 @@
+# Git フックの設定（lefthook）。リポジトリを取得したら lefthook install で有効にする
+pre-commit:
+  parallel: true
+  commands:
+    clang-format:
+      glob: "{src,platform,tests}/**/*.{c,h}"
+      run: clang-format -i {staged_files}
+      stage_fixed: true
+    # Kotlin の整形。android/ の Gradle プロジェクトを作ったら、行頭の # を外して有効にする
+    # ktlint:
+    #   glob: "platform/android/**/*.{kt,kts}"
+    #   run: ktlint --format {staged_files}
+    #   stage_fixed: true
