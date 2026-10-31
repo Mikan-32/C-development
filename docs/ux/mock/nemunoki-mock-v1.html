@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ねむのき — アプリUIモック v1</title>
+<style>
+:root{
+  --bg:#0E1330; --bg-2:#141A3D;
+  --card:#1A2147; --card-2:#232B5A; --card-3:#2C356E;
+  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.16);
+  --ink:#F2F3FA; --ink-2:#B8BCD8; --ink-3:#9298C2;
+  --brand:#F08CA8; --brand-deep:#E36F91; --brand-ink:#2A1222;
+  --series:#7788EE; --series-soft:rgba(119,136,238,.22);
+  --good:#5FD3A8; --warn:#F2C26B; --serious:#F09A6A; --bad:#F06A6A;
+  --radius:20px; --radius-s:14px;
+  --font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Noto Sans CJK JP","Yu Gothic UI",YuGothic,Meiryo,system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{font-family:var(--font);background:#070A1C;color:var(--ink);font-feature-settings:"palt";-webkit-font-smoothing:antialiased;line-height:1.5;overflow-x:hidden}
+button{font-family:inherit;color:inherit}
+button:focus-visible,textarea:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* ===== viewer chrome (outside the phone) ===== */
+.mockbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:10px 18px;background:rgba(7,10,28,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line);min-height:54px}
+.mockbar .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;letter-spacing:.02em;white-space:nowrap}
+.mockbar .brand svg{width:24px;height:24px}
+.mockbar .brand small{font-weight:600;color:var(--ink-3);margin-left:4px;font-size:12px}
+.mockbar .chips{display:flex;gap:6px;margin-left:auto}
+.mockbar .vchip{border:1px solid transparent;background:transparent;color:var(--ink-2);font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer}
+.mockbar .vchip.on{background:var(--card-2);color:var(--ink);border-color:var(--line-2)}
+.mockbar .seg{display:flex;border:1px solid var(--line-2);border-radius:999px;overflow:hidden;margin-left:10px}
+.mockbar .seg button{border:0;background:transparent;color:var(--ink-2);font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer}
+.mockbar .seg button.on{background:var(--brand);color:var(--brand-ink)}
+.stage{display:flex;justify-content:center;align-items:flex-start;gap:36px;padding:26px 20px 40px}
+.stage.gallery{justify-content:flex-start;overflow-x:auto;scroll-snap-type:x proximity}
+.slot{flex:none;position:relative;scroll-snap-align:center}
+.slot .cap{position:absolute;left:0;right:0;bottom:-30px;text-align:center;font-size:12px;color:var(--ink-3);font-weight:600}
+
+/* ===== phone ===== */
+.phone{position:relative;width:390px;height:844px;border-radius:48px;background:var(--bg);box-shadow:0 0 0 10px #171B30,0 0 0 12px #2B3050,0 40px 90px rgba(0,0,0,.65);overflow:hidden;transform-origin:top left;display:flex;flex-direction:column;isolation:isolate}
+.phone::before{content:"";position:absolute;inset:0;background:radial-gradient(130% 42% at 50% -8%,#2A3072 0%,rgba(42,48,114,0) 60%);pointer-events:none;z-index:0}
+.notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:122px;height:34px;background:#05070F;border-radius:20px;z-index:4}
+.statusbar{height:56px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 30px 8px;font-size:15px;font-weight:700;position:relative;z-index:2;letter-spacing:.01em}
+.statusbar .icons{display:flex;gap:6px;align-items:center}
+.statusbar svg{height:12px;width:auto;display:block}
+.screens{flex:1;min-height:0;position:relative;z-index:1}
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:6px 16px 28px;display:none;scrollbar-width:none;overscroll-behavior:contain}
+.screen::-webkit-scrollbar{display:none}
+.screen.active{display:block;animation:fade .26s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.screen.active{animation:none}}
+.tabbar{flex:none;height:86px;display:flex;justify-content:space-around;align-items:flex-start;padding:9px 10px 0;background:rgba(14,19,48,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);position:relative;z-index:2}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;width:76px;color:var(--ink-3);font-size:11px;font-weight:700;background:none;border:0;padding:4px 0;cursor:pointer;border-radius:12px}
+.tab.active{color:var(--brand)}
+.tab svg{width:26px;height:26px}
+.home-indicator{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:rgba(255,255,255,.35);z-index:3}
+.toast{position:absolute;left:50%;bottom:106px;transform:translateX(-50%) translateY(10px);background:#F2F3FA;color:#141A3D;padding:10px 16px;border-radius:999px;font-weight:700;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:6;box-shadow:0 10px 30px rgba(0,0,0,.45);display:flex;gap:8px;align-items:center;white-space:nowrap}
+.toast svg{width:18px;height:18px;color:#1D9E6E}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ===== shared components ===== */
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;border:1px solid var(--line);position:relative}
+.card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
+.card-h h2{font-size:15px;font-weight:800;margin:0}
+.hint{font-size:12px;color:var(--ink-3)}
+.link{color:var(--brand);font-size:13px;font-weight:700;background:none;border:0;padding:0;cursor:pointer;display:inline-flex;align-items:center;gap:2px}
+.link svg{width:14px;height:14px}
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:54px;border-radius:18px;background:linear-gradient(135deg,#F5A2B9,#E8769A);color:var(--brand-ink);font-weight:800;font-size:16px;border:0;box-shadow:0 10px 26px rgba(240,140,168,.28);cursor:pointer;margin-top:4px}
+.btn-primary svg{width:20px;height:20px}
+.btn-primary:active{transform:scale(.985)}
+.muted{color:var(--ink-3)} .sub{color:var(--ink-2)}
+.screen-title{display:flex;align-items:flex-end;justify-content:space-between;padding:12px 0 12px;gap:10px}
+.screen-title h1{font-size:24px;font-weight:800;margin:0;letter-spacing:.01em;line-height:1.2}
+.screen-title .date{font-size:12px;color:var(--ink-2);text-align:right;line-height:1.4}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap}
+.pill svg{width:12px;height:12px}
+.pill.good{background:rgba(95,211,168,.16);color:var(--good)}
+.pill.warn{background:rgba(242,194,107,.16);color:var(--warn)}
+.pill.serious{background:rgba(240,154,106,.18);color:var(--serious)}
+.pill.neutral{background:rgba(255,255,255,.08);color:var(--ink-2)}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tiles2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.tile{background:var(--card-2);border-radius:14px;padding:10px 11px;min-width:0}
+.tiles .tile{padding:10px 8px}
+.tile .k{font-size:11px;color:var(--ink-3);white-space:nowrap}
+.tile .v{font-size:18px;font-weight:800;margin-top:2px;line-height:1.2;white-space:nowrap}
+.tiles .tile .v{font-size:16px}
+.tile .d{font-size:11px;margin-top:3px;color:var(--ink-3);display:flex;align-items:center;gap:3px;white-space:nowrap}
+.tile .d.up{color:var(--good)} .tile .d.down{color:var(--serious)}
+.tile .d svg{width:11px;height:11px}
+
+/* ===== home ===== */
+.home-top{display:flex;align-items:center;justify-content:space-between;padding:10px 0 12px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:18px;letter-spacing:.03em}
+.logo svg{width:28px;height:28px}
+.avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#3B4390,#7788EE);display:grid;place-items:center;font-weight:800;font-size:15px;border:2px solid rgba(255,255,255,.12)}
+.greet{font-size:22px;font-weight:800;margin:0 0 2px;line-height:1.3}
+.score-card{display:grid;grid-template-columns:128px 1fr;gap:16px;align-items:center}
+.ring{position:relative;width:128px;height:128px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .num{font-size:40px;font-weight:800;line-height:1}
+.ring .lbl{font-size:11px;color:var(--ink-3);margin-top:3px;font-weight:600}
+.score-side .k{font-size:12px;color:var(--ink-3)}
+.score-side .big{font-size:28px;font-weight:800;line-height:1.15;margin:2px 0 6px}
+.score-side .times{font-size:13px;color:var(--ink-2);display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.score-side .times svg{width:14px;height:14px;color:var(--ink-3)}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat3 .s{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 8px;text-align:center}
+.stat3 .k{font-size:11px;color:var(--ink-3)} .stat3 .v{font-size:16px;font-weight:800;margin-top:2px;display:flex;justify-content:center;align-items:center;gap:5px}
+.stat3 .v svg{width:20px;height:20px}
+.advice-card{background:linear-gradient(135deg,rgba(240,140,168,.16),rgba(119,136,238,.12)),var(--card);border-color:rgba(240,140,168,.25)}
+.advice-card .tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:var(--brand);letter-spacing:.06em;margin-bottom:6px}
+.advice-card .tag svg{width:14px;height:14px}
+.advice-card h3{font-size:17px;font-weight:800;margin:0 0 6px;line-height:1.35}
+.advice-card p{margin:0 0 10px;font-size:13px;color:var(--ink-2);line-height:1.6}
+.plot>svg{display:block;width:100%;height:auto;font-family:var(--font)}
+.plot .hit{cursor:pointer}
+
+/* ===== record ===== */
+.field{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
+.field+.field{border-top:1px solid var(--line)}
+.field .k{font-size:14px;color:var(--ink-2);display:flex;align-items:center;gap:8px;font-weight:600}
+.field .k svg{width:18px;height:18px;color:var(--ink-3)}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper .t{font-size:26px;font-weight:800;min-width:76px;text-align:center;font-variant-numeric:tabular-nums}
+.stepper button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line-2);background:var(--card-2);color:var(--ink);font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
+.stepper button:active{background:var(--card-3)}
+.dur-line{display:flex;justify-content:space-between;align-items:center;background:var(--card-2);border-radius:14px;padding:10px 14px;margin-top:10px}
+.dur-line strong{font-size:18px;font-weight:800}
+.q{font-size:13px;color:var(--ink-2);margin:12px 0 8px;font-weight:600}
+.q:first-of-type{margin-top:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 13px;border-radius:999px;background:var(--card-2);border:1px solid transparent;color:var(--ink-2);font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1.3}
+.chip svg{width:16px;height:16px}
+.chip .ck{display:none;width:14px;height:14px}
+.chip.on{background:rgba(240,140,168,.16);border-color:var(--brand);color:var(--ink)}
+.chip.on .ck{display:block;color:var(--brand)}
+.seg4{display:grid;grid-template-columns:repeat(4,1fr);background:var(--card-2);border-radius:12px;padding:3px;gap:3px}
+.seg4 button{border:0;background:transparent;color:var(--ink-2);padding:9px 0;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer}
+.seg4 button.on{background:#3A4596;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.moods{display:flex;justify-content:space-between;gap:2px}
+.mood{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;color:var(--ink-3);font-size:11px;font-weight:600;cursor:pointer;flex:1;padding:4px 0;border-radius:12px}
+.mood svg{width:42px;height:42px}
+.mood .face{fill:var(--card-2);stroke:var(--ink-3);stroke-width:1.6}
+.mood .eye{fill:var(--ink-3)} .mood .mouth{fill:none;stroke:var(--ink-3);stroke-width:2;stroke-linecap:round}
+.mood.on{color:var(--ink)}
+.mood.on .face{fill:var(--brand);stroke:var(--brand)} .mood.on .eye{fill:var(--brand-ink)} .mood.on .mouth{stroke:var(--brand-ink)}
+.facesvg .face{fill:var(--card-2);stroke:var(--ink-3);stroke-width:1.6}
+.facesvg .eye{fill:var(--ink-2)}
+.facesvg .mouth{fill:none;stroke:var(--ink-2);stroke-width:2;stroke-linecap:round}
+textarea{width:100%;min-height:76px;border-radius:14px;border:1px solid var(--line-2);background:var(--card-2);color:var(--ink);padding:10px 12px;font:inherit;font-size:14px;resize:none;display:block}
+textarea::placeholder{color:var(--ink-3)}
+.disclaimer{font-size:11px;color:var(--ink-3);padding:6px 4px 10px;line-height:1.7;margin:0}
+
+/* ===== advice ===== */
+.acc .acc-h{display:flex;gap:12px;align-items:flex-start;cursor:pointer;width:100%;background:none;border:0;color:inherit;text-align:left;padding:0;border-radius:12px}
+.acc .acc-h:focus-visible{outline:2px solid var(--brand);outline-offset:4px}
+.acc-ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none;background:var(--series-soft);color:#C3CAFF}
+.acc-ic svg{width:22px;height:22px}
+.acc-t{flex:1;min-width:0}
+.acc-t .row1{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.acc-t h3{font-size:15px;font-weight:800;margin:0;line-height:1.35}
+.acc-t p{margin:3px 0 0;font-size:13px;color:var(--ink-2);line-height:1.6}
+.prio{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;flex:none}
+.prio.high{background:rgba(240,154,106,.18);color:var(--serious)}
+.prio.mid{background:rgba(242,194,107,.16);color:var(--warn)}
+.prio.low{background:rgba(119,136,238,.2);color:#B7BEFF}
+.chev{width:20px;height:20px;color:var(--ink-3);flex:none;transition:transform .2s;margin-top:2px}
+.acc.open .chev{transform:rotate(180deg)}
+.acc-body{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-2)}
+.acc.open .acc-body{display:block}
+.acc-body h4{font-size:12px;color:var(--ink-3);margin:0 0 6px;font-weight:800;letter-spacing:.04em}
+.acc-body h4+h4{margin-top:12px}
+.evid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.evid span{background:var(--card-2);border-radius:10px;padding:6px 10px;font-size:12px;color:var(--ink)}
+.evid span b{color:var(--ink-3);font-weight:600;margin-right:5px}
+.steps{margin:0;padding:0;list-style:none}
+.steps li{display:flex;gap:9px;padding:6px 0;line-height:1.55;color:var(--ink)}
+.steps li::before{content:"";width:18px;height:18px;border-radius:50%;border:1.5px solid var(--brand);flex:none;margin-top:2px}
+
+/* ===== history ===== */
+.seg2{display:inline-grid;grid-template-columns:1fr 1fr;background:var(--card);border-radius:12px;padding:3px;gap:3px;border:1px solid var(--line)}
+.seg2 button{min-width:52px;border:0;background:transparent;color:var(--ink-2);padding:6px 0;border-radius:9px;font-weight:800;font-size:13px;cursor:pointer}
+.seg2 button.on{background:#3A4596;color:#fff}
+.period{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px;color:var(--ink-2);font-size:13px;font-weight:600}
+.period button{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink-2);cursor:pointer;display:grid;place-items:center;padding:0}
+.period button:disabled{opacity:.35;cursor:default}
+.period button svg{width:16px;height:16px}
+.day-detail{display:flex;justify-content:space-between;align-items:center;background:var(--card-2);border-radius:12px;padding:9px 12px;margin-top:10px;font-size:13px;gap:8px}
+.day-detail b{font-weight:800}
+.rows .row{display:grid;grid-template-columns:58px 1fr 100px 26px;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+.rows .row:first-child{border-top:0;padding-top:2px}
+.rows .row .d{font-weight:700} .rows .row .d small{display:block;font-size:11px;color:var(--ink-3);font-weight:600}
+.rows .bar{height:6px;border-radius:3px;background:var(--series-soft);position:relative}
+.rows .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--series)}
+.rows .bar .g{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--ink-3)}
+.rows .v{font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.rows .v small{display:block;font-size:11px;color:var(--ink-3);font-weight:600}
+.rows .row svg{width:26px;height:26px}
+
+@media (max-width:900px){.mockbar .brand small{display:none}}
+@media (max-width:680px){.mockbar .chips{display:none}.mockbar .seg{margin-left:auto}}
+
+/* ===== native (real phone) ===== */
+body.native .mockbar .chips,body.native .mockbar .seg{display:none}
+body.native .stage{padding:0;gap:0}
+body.native .slot{width:100%!important;height:calc(100dvh - 54px)!important}
+body.native .phone{width:100%!important;height:100%!important;border-radius:0;box-shadow:none;transform:none!important}
+body.native .notch,body.native .home-indicator{display:none}
+body.native .statusbar{display:none}
+</style>
+</head>
+<body>
+
+<header class="mockbar">
+  <div class="brand"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M18.5 4.5a9.5 9.5 0 1 0 5 17.3A8 8 0 0 1 18.5 4.5z" fill="#F08CA8"/><path d="M9 25.5c0-3.2 1.6-5.2 4.5-6.1-1 1.4-1.5 3.3-1.5 6.1z" fill="#7788EE"/><path d="M9 25.5c0-3.2-1.6-5.2-4.5-6.1 1 1.4 1.5 3.3 1.5 6.1z" fill="#7788EE"/></svg>ねむのき<small>UIモック v1 ・ iPhone 390×844</small></div>
+  <div class="chips" id="viewer-chips">
+    <button class="vchip on" data-action="tab" data-screen="home">ホーム</button>
+    <button class="vchip" data-action="tab" data-screen="record">記録</button>
+    <button class="vchip" data-action="tab" data-screen="advice">アドバイス</button>
+    <button class="vchip" data-action="tab" data-screen="history">履歴</button>
+  </div>
+  <div class="seg" id="layout-seg">
+    <button class="on" data-action="layout" data-value="single">1画面</button>
+    <button data-action="layout" data-value="gallery">4画面を並べる</button>
+  </div>
+</header>
+
+<main class="stage" id="stage">
+  <div class="slot" id="main-slot">
+    <div class="phone" id="main-phone">
+      <div class="notch"></div>
+      <div class="statusbar"><span class="time">7:12</span><span class="icons">
+        <svg viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx=".8" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx=".8" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx=".8" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx=".8" fill="currentColor"/></svg>
+        <svg viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.2 1 4.6a10 10 0 0 1 14 0z" fill="currentColor" opacity=".35"/><path d="M8 11.2 3.5 7a6.4 6.4 0 0 1 9 0z" fill="currentColor"/></svg>
+        <svg viewBox="0 0 27 12" aria-hidden="true"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".5"/><rect x="2" y="2" width="17" height="8" rx="1.8" fill="currentColor"/><path d="M24.5 4v4a2 2 0 0 0 0-4z" fill="currentColor" opacity=".5"/></svg>
+      </span></div>
+      <div class="screens" id="screens">
+
+        <!-- ================= ホーム ================= -->
+        <section class="screen active" data-screen="home" aria-label="ホーム">
+          <div class="home-top">
+            <div class="logo"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M18.5 4.5a9.5 9.5 0 1 0 5 17.3A8 8 0 0 1 18.5 4.5z" fill="#F08CA8"/><path d="M9 25.5c0-3.2 1.6-5.2 4.5-6.1-1 1.4-1.5 3.3-1.5 6.1z" fill="#7788EE"/><path d="M9 25.5c0-3.2-1.6-5.2-4.5-6.1 1 1.4 1.5 3.3 1.5 6.1z" fill="#7788EE"/></svg>ねむのき</div>
+            <div class="avatar" aria-label="プロフィール">遥</div>
+          </div>
+          <p class="greet">おはようございます、遥陽さん</p>
+          <p class="sub" id="home-date" style="margin:0 0 14px;font-size:13px"></p>
+          <div class="card score-card" id="home-score"></div>
+          <div class="stat3" id="home-stats"></div>
+          <div class="card advice-card" id="home-advice"></div>
+          <div class="card chart" id="home-week"></div>
+          <button class="btn-primary" data-action="goto" data-screen="record"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>睡眠を記録する</button>
+        </section>
+
+        <!-- ================= 記録 ================= -->
+        <section class="screen" data-screen="record" aria-label="睡眠を記録">
+          <div class="screen-title"><h1>睡眠を記録</h1><div class="date" id="rec-date"></div></div>
+          <div class="card">
+            <div class="card-h"><h2>就寝・起床</h2><span class="hint">10分きざみで調整</span></div>
+            <div class="field">
+              <span class="k"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>就寝時刻</span>
+              <div class="stepper"><button data-action="step" data-field="bed" data-delta="-10" aria-label="就寝時刻を10分早く">−</button><span class="t" id="f-bed">23:42</span><button data-action="step" data-field="bed" data-delta="10" aria-label="就寝時刻を10分遅く">＋</button></div>
+            </div>
+            <div class="field">
+              <span class="k"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>起床時刻</span>
+              <div class="stepper"><button data-action="step" data-field="wake" data-delta="-10" aria-label="起床時刻を10分早く">−</button><span class="t" id="f-wake">6:30</span><button data-action="step" data-field="wake" data-delta="10" aria-label="起床時刻を10分遅く">＋</button></div>
+            </div>
+            <div class="dur-line"><span class="sub">睡眠時間</span><strong id="f-dur">6時間48分</strong></div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h2>眠りの質</h2></div>
+            <p class="q">寝つくまでにかかった時間</p>
+            <div class="chips" id="f-latency"></div>
+            <p class="q">夜中に目が覚めた回数</p>
+            <div class="seg4" id="f-awak">
+              <button data-action="pick" data-group="awak" data-value="0">0回</button>
+              <button data-action="pick" data-group="awak" data-value="1">1回</button>
+              <button data-action="pick" data-group="awak" data-value="2">2回</button>
+              <button data-action="pick" data-group="awak" data-value="3">3回以上</button>
+            </div>
+            <p class="q">目覚めの気分</p>
+            <div class="moods" id="f-mood"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h2>昨日の習慣</h2><span class="hint">あてはまるものを選択</span></div>
+            <div class="chips" id="f-habits"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><h2>メモ</h2><span class="hint">任意</span></div>
+            <textarea id="f-memo" placeholder="気になったことがあれば（例：寝る前に考えごとをしていた）"></textarea>
+          </div>
+
+          <button class="btn-primary" data-action="save"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>記録する</button>
+          <p class="disclaimer" style="text-align:center">記録はあとからいつでも編集できます</p>
+        </section>
+
+        <!-- ================= アドバイス ================= -->
+        <section class="screen" data-screen="advice" aria-label="アドバイス">
+          <div class="screen-title"><h1>アドバイス</h1><div class="date">直近7日間の記録から<br>毎朝 更新</div></div>
+          <div class="card">
+            <div class="card-h"><h2>今週のまとめ</h2><button class="link" data-action="goto" data-screen="history">履歴を見る<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+            <div class="tiles" id="adv-tiles"></div>
+          </div>
+          <div id="adv-list"></div>
+          <p class="disclaimer">ねむのきのアドバイスは、一般的な睡眠衛生の知見とあなたの記録をもとに作成しています。医療上の診断・治療に代わるものではありません。眠れない状態が2週間以上続く場合は、医療機関にご相談ください。</p>
+        </section>
+
+        <!-- ================= 履歴 ================= -->
+        <section class="screen" data-screen="history" aria-label="履歴">
+          <div class="screen-title"><h1>履歴</h1><div class="seg2" id="h-range"><button class="on" data-action="range" data-value="week">週</button><button data-action="range" data-value="month">月</button></div></div>
+          <div class="period">
+            <button aria-label="前の期間"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <span id="h-period"></span>
+            <button aria-label="次の期間" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div class="tiles2" id="h-tiles"></div>
+          <div class="card chart">
+            <div class="card-h"><h2>睡眠時間</h2><span class="hint" id="h-bars-hint">タップして日を選択</span></div>
+            <div class="plot" id="h-bars"></div>
+            <div class="day-detail" id="h-detail"></div>
+          </div>
+          <div class="card chart">
+            <div class="card-h"><h2>就寝と起床のリズム</h2><span class="hint">21:00 → 9:00</span></div>
+            <div class="plot" id="h-rhythm"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2 id="h-rows-title">日別の記録</h2><span class="hint">目標 7時間30分</span></div>
+            <div class="rows" id="h-rows"></div>
+          </div>
+        </section>
+
+      </div>
+      <nav class="tabbar" aria-label="メインナビゲーション">
+        <button class="tab active" data-action="tab" data-screen="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>ホーム</button>
+        <button class="tab" data-action="tab" data-screen="record"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></svg>記録</button>
+        <button class="tab" data-action="tab" data-screen="advice"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 18h5M10.5 21h3M12 3a6 6 0 0 0-3.9 10.6c.6.5.9 1.2.9 2V16h6v-.4c0-.8.3-1.5.9-2A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>アドバイス</button>
+        <button class="tab" data-action="tab" data-screen="history"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-7M12 20V5M19 20v-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>履歴</button>
+      </nav>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+'use strict';
+/* =====================================================================
+   ねむのき UIモック v1 — すべての画面は下の records（1週間分のサンプル）から
+   描画しています。数値を変えると、ホーム／アドバイス／履歴が連動して変わります。
+   ===================================================================== */
+const GOAL = 450;                       // 目標睡眠時間（分）= 7時間30分
+const DAYS = ['日','月','火','水','木','金','土'];
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+// ---- サンプルデータ（起床した日付で管理。bed/wake は 0:00 からの分） ----
+const records = [
+  { date: '2026-10-10', bed: 35,   wake: 490, latency: 10, awak: 0, mood: 4, habits: ['alcohol', 'phone'],  memo: '' },
+  { date: '2026-10-11', bed: 70,   wake: 520, latency: 25, awak: 1, mood: 3, habits: ['phone', 'nap'],      memo: '' },
+  { date: '2026-10-12', bed: 1430, wake: 390, latency: 12, awak: 0, mood: 3, habits: ['exercise'],          memo: '' },
+  { date: '2026-10-13', bed: 5,    wake: 390, latency: 30, awak: 2, mood: 2, habits: ['caffeine', 'phone'], memo: '' },
+  { date: '2026-10-14', bed: 1410, wake: 390, latency: 8,  awak: 0, mood: 4, habits: ['exercise'],          memo: '' },
+  { date: '2026-10-15', bed: 20,   wake: 375, latency: 35, awak: 2, mood: 2, habits: ['caffeine', 'phone'], memo: '' },
+  { date: '2026-10-16', bed: 1422, wake: 390, latency: 18, awak: 1, mood: 3, habits: ['phone'],             memo: '' },
+];
+// 月表示用：過去3週の週平均（avgBedRel は 21:00 起点の分）
+const prevWeeks = [
+  { label: '9/19–9/25', short: '9/19',  avgDur: 395, avgBedRel: 198, met: 1 },
+  { label: '9/26–10/2', short: '9/26',  avgDur: 418, avgBedRel: 175, met: 2 },
+  { label: '10/3–10/9', short: '10/3',  avgDur: 401, avgBedRel: 192, met: 1 },
+];
+
+const ICON = {
+  coffee: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 8h12v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8zM16 9.5h1.5a2.25 2.25 0 0 1 0 4.5H16M6 21h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  glass:  '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 3h10l-1 9a4 4 0 0 1-8 0zM12 16v5M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  run:    '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="15" cy="4.5" r="2" fill="currentColor"/><path d="m6 20 3.5-6 3 2.5L14 11l-3-1.5L8 12M12 10.5 14.5 8l3 2 2.5-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  phone:  '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 17.5h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  nap:    '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 18V9m0 5h18v4M3 14V9h8a4 4 0 0 1 4 4v1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="11" r="1.6" fill="currentColor"/></svg>',
+  clock:  '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  sun:    '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  moon:   '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+  chev:   '<svg class="chev" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  arrow:  '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check:  '<svg class="ck" aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  checkCircle: '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7.5 12.5 3 3 6-6.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  up:     '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 19V6M6 12l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  down:   '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v13M6 12l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  spark:  '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9z" fill="currentColor"/></svg>',
+};
+const HABITS = [
+  { id: 'caffeine', label: 'カフェイン（14時以降）', icon: ICON.coffee },
+  { id: 'alcohol',  label: 'お酒',                   icon: ICON.glass },
+  { id: 'exercise', label: '運動',                   icon: ICON.run },
+  { id: 'phone',    label: '寝る前スマホ',           icon: ICON.phone },
+  { id: 'nap',      label: '昼寝',                   icon: ICON.nap },
+];
+const MOODS = ['とても悪い', '悪い', 'ふつう', '良い', 'とても良い'];
+const LATENCY_LABELS = ['10分以内', '10〜30分', '30分以上'];
+const LATENCY_BANDS  = [8, 18, 35];     // チップ → 代表値（分）
+const TITLES = { home: 'ホーム', record: '記録', advice: 'アドバイス', history: '履歴' };
+
+// ---- 書式ヘルパー ----
+const pad2 = n => String(n).padStart(2, '0');
+const norm = m => ((m % 1440) + 1440) % 1440;
+const fmtClock = m => { m = norm(Math.round(m)); return `${Math.floor(m / 60)}:${pad2(m % 60)}`; };
+const fmtDur = m => { m = Math.round(m); const h = Math.floor(m / 60), mm = m % 60; return h ? (mm ? `${h}時間${mm}分` : `${h}時間`) : `${mm}分`; };
+const fmtDurShort = m => { m = Math.round(m); return `${Math.floor(m / 60)}h${pad2(m % 60)}m`; };
+const dur = r => norm(r.wake - r.bed);
+const bedRel = r => norm(r.bed - 1260);            // 21:00 起点
+const relToClock = rel => fmtClock(1260 + rel);
+const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+const dateParts = s => { const [y, m, d] = s.split('-').map(Number); return { y, m, d, dow: new Date(y, m - 1, d).getDay() }; };
+const fmtMD   = s => { const p = dateParts(s); return `${p.m}/${p.d}`; };
+const fmtMDW  = s => { const p = dateParts(s); return `${p.m}/${p.d}（${DAYS[p.dow]}）`; };
+const fmtLong = s => { const p = dateParts(s); return `${p.m}月${p.d}日（${DAYS[p.dow]}）`; };
+const prevDate = s => { const p = dateParts(s); const d = new Date(p.y, p.m - 1, p.d - 1); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+const isWeekend = s => { const w = dateParts(s).dow; return w === 0 || w === 6; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---- スコア（モック用の簡易ロジック） ----
+function score(r) {
+  const s1 = Math.min(1, dur(r) / GOAL) * 60;                                  // 睡眠時間 60点
+  const s2 = r.latency <= 10 ? 15 : r.latency <= 20 ? 12 : r.latency <= 30 ? 9 : 5; // 寝つき 15点
+  const s3 = r.awak === 0 ? 15 : r.awak === 1 ? 11 : r.awak === 2 ? 7 : 3;     // 中途覚醒 15点
+  const s4 = (r.mood - 1) / 4 * 10;                                            // 目覚めの気分 10点
+  return Math.round(s1 + s2 + s3 + s4);
+}
+const scoreLabel = s => s >= 85 ? 'とても良い' : s >= 70 ? '良い' : s >= 55 ? 'まずまず' : '要改善';
+const scoreTone  = s => s >= 70 ? 'good' : s >= 55 ? 'warn' : 'serious';
+const toneColor  = t => ({ good: '#5FD3A8', warn: '#F2C26B', serious: '#F09A6A' })[t];
+
+const MOUTHS = ['M13 27q7-6 14 0', 'M14 26q6-3 12 0', 'M14 25h12', 'M14 24q6 4 12 0', 'M13 23q7 7 14 0'];
+const faceSVG = (level, cls = '') => `<svg class="${cls}" viewBox="0 0 40 40" aria-hidden="true"><circle class="face" cx="20" cy="20" r="17"/><circle class="eye" cx="14" cy="16.5" r="1.9"/><circle class="eye" cx="26" cy="16.5" r="1.9"/><path class="mouth" d="${MOUTHS[level - 1]}"/></svg>`;
+const tile = (k, v, d = '', cls = '') => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div>${d ? `<div class="d ${cls}">${d}</div>` : ''}</div>`;
+
+// ---- 週の統計 ----
+function weekStats() {
+  const durs = records.map(dur);
+  const bedRels = records.map(bedRel);
+  const wd = records.filter(r => !isWeekend(r.date)), we = records.filter(r => isWeekend(r.date));
+  const by = (pred, f) => { const a = records.filter(pred); return a.length ? mean(a.map(f)) : null; };
+  const wdBed = wd.length ? mean(wd.map(bedRel)) : null, weBed = we.length ? mean(we.map(bedRel)) : null;
+  return {
+    avgDur: mean(durs), avgBedRel: mean(bedRels), avgWake: mean(records.map(r => r.wake)),
+    met: durs.filter(d => d >= GOAL).length,
+    wdBed, weBed, weekendDiff: (wdBed != null && weBed != null) ? Math.round(weBed) - Math.round(wdBed) : null,
+    earliest: Math.min(...bedRels), latest: Math.max(...bedRels), range: Math.max(...bedRels) - Math.min(...bedRels),
+    phoneLat: by(r => r.habits.includes('phone'), r => r.latency), noPhoneLat: by(r => !r.habits.includes('phone'), r => r.latency),
+    cafAwak: by(r => r.habits.includes('caffeine'), r => r.awak), noCafAwak: by(r => !r.habits.includes('caffeine'), r => r.awak),
+  };
+}
+
+// ---- チャート（SVG文字列を生成） ----
+const INK = '#F2F3FA', INK2 = '#B8BCD8', INK3 = '#9298C2', SERIES = '#7788EE', GRID = 'rgba(255,255,255,.08)';
+function barPath(x, yTop, w, yBase, r = 4) {
+  const h = yBase - yTop; if (h <= 0) return '';
+  const rr = Math.min(r, h, w / 2);
+  return `M${x},${yBase}V${yTop + rr}Q${x},${yTop} ${x + rr},${yTop}H${x + w - rr}Q${x + w},${yTop} ${x + w},${yTop + rr}V${yBase}Z`;
+}
+function goalTag(x, yv) {
+  return `<text x="${x}" y="${yv - 2}" font-size="9.5" font-weight="700" fill="${INK2}">目標</text><text x="${x}" y="${yv + 9}" font-size="9.5" font-weight="700" fill="${INK2}">${fmtDurShort(GOAL)}</text>`;
+}
+// 睡眠時間の棒グラフ（単一系列・選択した棒のみ直接ラベル）
+function barChart(items, sel, opts = {}) {
+  const mini = !!opts.mini;
+  const W = 326, H = mini ? 122 : 196, padL = mini ? 6 : 30, padR = 50, padT = mini ? 22 : 24, padB = mini ? 20 : 38;
+  const plotW = W - padL - padR, plotH = H - padT - padB, yBase = padT + plotH, max = 600;
+  const y = v => yBase - (Math.min(v, max) / max) * plotH;
+  const n = items.length, band = plotW / n, bw = Math.min(22, band * 0.55);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label || '睡眠時間の推移')}">`;
+  if (!mini) {
+    [0, 180, 360, 540].forEach(v => {
+      s += `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="${GRID}"/>`;
+      s += `<text x="${padL - 7}" y="${y(v) + 3.5}" text-anchor="end" font-size="10" fill="${INK3}">${v ? v / 60 + 'h' : '0'}</text>`;
+    });
+  } else {
+    s += `<line x1="${padL}" x2="${W - padR}" y1="${yBase}" y2="${yBase}" stroke="rgba(255,255,255,.14)"/>`;
+  }
+  s += `<line x1="${padL}" x2="${W - padR}" y1="${y(GOAL)}" y2="${y(GOAL)}" stroke="${INK2}" stroke-opacity=".85" stroke-dasharray="4 3"/>` + goalTag(W - padR + 6, y(GOAL));
+  items.forEach((it, i) => {
+    const cx = padL + band * i + band / 2, x = cx - bw / 2, yt = y(it.value), on = i === sel;
+    s += `<path d="${barPath(x, yt, bw, yBase)}" fill="${SERIES}" fill-opacity="${on ? 1 : 0.5}"/>`;
+    if (on) {
+      let ly = yt - 7;                                        // 値ラベルは棒の上
+      if (Math.abs(ly - y(GOAL)) < 10) ly = y(GOAL) - 9;      // 目標線と重なるときは線の上へ逃がす
+      s += `<text x="${cx}" y="${ly}" text-anchor="middle" font-size="11" font-weight="800" fill="${INK}">${fmtDurShort(it.value)}</text>`;
+    }
+    s += `<text x="${cx}" y="${yBase + 15}" text-anchor="middle" font-size="11" font-weight="${on ? 800 : 600}" fill="${on ? INK : INK3}">${esc(it.label)}</text>`;
+    if (it.sub && !mini) s += `<text x="${cx}" y="${yBase + 29}" text-anchor="middle" font-size="9.5" fill="${INK3}">${esc(it.sub)}</text>`;
+    if (!mini) s += `<rect class="hit" x="${padL + band * i}" y="${padT - 12}" width="${band}" height="${plotH + padB + 12}" fill="transparent" data-action="selday" data-idx="${i}"><title>${esc(it.title || '')}</title></rect>`;
+  });
+  return s + '</svg>';
+}
+// 就寝→起床のリズム（21:00〜9:00 の縦軸にフローティングバー）
+function rhythmChart(items, sel) {
+  const W = 326, H = 214, padL = 38, padR = 12, padT = 16, padB = 42;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const y = rel => padT + (Math.max(0, Math.min(720, rel)) / 720) * plotH;
+  const n = items.length, band = plotW / n, bw = 16;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="就寝と起床の時刻">`;
+  [0, 180, 360, 540, 720].forEach(rel => {
+    s += `<line x1="${padL}" x2="${W - padR}" y1="${y(rel)}" y2="${y(rel)}" stroke="${GRID}"/>`;
+    s += `<text x="${padL - 7}" y="${y(rel) + 3.5}" text-anchor="end" font-size="10" fill="${INK3}">${relToClock(rel)}</text>`;
+  });
+  items.forEach((it, i) => {
+    const cx = padL + band * i + band / 2, x = cx - bw / 2, y1 = y(it.bedRel), y2 = y(it.wakeRel), on = i === sel;
+    s += `<rect x="${x}" y="${y1}" width="${bw}" height="${Math.max(2, y2 - y1)}" rx="${bw / 2}" fill="${SERIES}" fill-opacity="${on ? 1 : 0.5}"/>`;
+    if (on) {
+      s += `<text x="${cx}" y="${y1 - 5}" text-anchor="middle" font-size="10" font-weight="800" fill="${INK}">${relToClock(it.bedRel)}</text>`;
+      s += `<text x="${cx}" y="${y2 + 11}" text-anchor="middle" font-size="10" font-weight="800" fill="${INK}">${relToClock(it.wakeRel)}</text>`;
+    }
+    s += `<text x="${cx}" y="${padT + plotH + 20}" text-anchor="middle" font-size="11" font-weight="${on ? 800 : 600}" fill="${on ? INK : INK3}">${esc(it.label)}</text>`;
+    if (it.sub) s += `<text x="${cx}" y="${padT + plotH + 33}" text-anchor="middle" font-size="9.5" fill="${INK3}">${esc(it.sub)}</text>`;
+    s += `<rect class="hit" x="${padL + band * i}" y="${padT - 10}" width="${band}" height="${plotH + padB + 10}" fill="transparent" data-action="selday" data-idx="${i}"><title>${esc(it.title || '')}</title></rect>`;
+  });
+  return s + '</svg>';
+}
+
+// ---- 画面：ホーム ----
+function renderHome() {
+  const last = records[records.length - 1];
+  const d = dur(last), sc = score(last), tone = scoreTone(sc), short = GOAL - d;
+  const r = 52, c = 2 * Math.PI * r;
+  $('#home-date').textContent = fmtLong(last.date);
+  $('#home-score').innerHTML = `
+    <div class="ring" role="img" aria-label="睡眠スコア ${sc}点（${scoreLabel(sc)}）">
+      <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="${r}" fill="none" stroke="${toneColor(tone)}" stroke-opacity=".16" stroke-width="9"/><circle cx="60" cy="60" r="${r}" fill="none" stroke="${toneColor(tone)}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(c * sc / 100).toFixed(1)} ${c.toFixed(1)}"/></svg>
+      <div class="val"><span class="num">${sc}</span><span class="lbl">睡眠スコア</span></div>
+    </div>
+    <div class="score-side">
+      <div class="k">昨夜の睡眠時間</div>
+      <div class="big">${fmtDur(d)}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill ${tone}"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="currentColor"/></svg>${scoreLabel(sc)}</span>${short > 0 ? `<span class="pill neutral">目標まで あと${fmtDur(short)}</span>` : `<span class="pill good">目標達成</span>`}</div>
+      <div class="times">${ICON.moon}${fmtClock(last.bed)}<span class="muted">→</span>${ICON.sun}${fmtClock(last.wake)}</div>
+    </div>`;
+  $('#home-stats').innerHTML = `
+    <div class="s"><div class="k">寝つき</div><div class="v">${last.latency}分</div></div>
+    <div class="s"><div class="k">中途覚醒</div><div class="v">${last.awak}回</div></div>
+    <div class="s"><div class="k">目覚めの気分</div><div class="v" style="font-size:14px">${faceSVG(last.mood, 'facesvg')}${MOODS[last.mood - 1]}</div></div>`;
+  const targetBed = norm(last.wake - GOAL);
+  $('#home-advice').innerHTML = `
+    <div class="tag">${ICON.spark}今日のアドバイス</div>
+    <h3>${short > 0 ? `今夜は ${fmtClock(targetBed)} までにベッドへ` : '今夜も同じリズムで眠りましょう'}</h3>
+    <p>${short > 0
+      ? `昨夜より${fmtDur(short)}早く眠りにつくと、目標の${fmtDur(GOAL)}に届きます。起床は今朝と同じ ${fmtClock(last.wake)} のままで大丈夫です。`
+      : `昨夜は目標の${fmtDur(GOAL)}を達成しました。就寝 ${fmtClock(last.bed)}・起床 ${fmtClock(last.wake)} のリズムを今夜も続けましょう。`}</p>
+    <button class="link" data-action="goto" data-screen="advice">すべてのアドバイスを見る${ICON.arrow}</button>`;
+  const items = records.map(rec => ({ label: DAYS[dateParts(rec.date).dow], value: dur(rec) }));
+  $('#home-week').innerHTML = `<div class="card-h"><h2>今週の睡眠時間</h2><button class="link" data-action="goto" data-screen="history">履歴を見る${ICON.arrow}</button></div><div class="plot">${barChart(items, records.length - 1, { mini: true, label: '今週の睡眠時間' })}</div>`;
+}
+
+// ---- 画面：記録 ----
+const form = {};
+function loadForm() {
+  const r = records[records.length - 1];
+  Object.assign(form, { bed: r.bed, wake: r.wake, latency: r.latency <= 10 ? 0 : r.latency <= 30 ? 1 : 2, awak: Math.min(3, r.awak), mood: r.mood, habits: new Set(r.habits), memo: r.memo || '' });
+}
+function renderForm() {
+  const last = records[records.length - 1];
+  $('#rec-date').innerHTML = `${fmtMDW(prevDate(last.date))} の夜 →<br>${fmtMDW(last.date)} の朝`;
+  $('#f-bed').textContent = fmtClock(form.bed);
+  $('#f-wake').textContent = fmtClock(form.wake);
+  $('#f-dur').textContent = fmtDur(norm(form.wake - form.bed));
+  $('#f-latency').innerHTML = LATENCY_LABELS.map((l, i) => `<button class="chip ${form.latency === i ? 'on' : ''}" data-action="pick" data-group="latency" data-value="${i}" aria-pressed="${form.latency === i}">${l}${ICON.check}</button>`).join('');
+  $$('#f-awak button').forEach(b => { const on = +b.dataset.value === form.awak; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  $('#f-mood').innerHTML = MOODS.map((m, i) => `<button class="mood ${form.mood === i + 1 ? 'on' : ''}" data-action="pick" data-group="mood" data-value="${i + 1}" aria-pressed="${form.mood === i + 1}">${faceSVG(i + 1)}${m}</button>`).join('');
+  $('#f-habits').innerHTML = HABITS.map(h => `<button class="chip ${form.habits.has(h.id) ? 'on' : ''}" data-action="habit" data-value="${h.id}" aria-pressed="${form.habits.has(h.id)}">${h.icon}${h.label}${ICON.check}</button>`).join('');
+  const memo = $('#f-memo'); if (memo.value !== form.memo) memo.value = form.memo;
+}
+function saveForm(phone) {
+  const r = records[records.length - 1];
+  Object.assign(r, { bed: form.bed, wake: form.wake, latency: LATENCY_BANDS[form.latency], awak: form.awak, mood: form.mood, habits: [...form.habits], memo: form.memo });
+  renderAll();
+  showToast('記録しました', phone);
+  go('home');
+}
+
+// ---- 画面：アドバイス ----
+function renderAdvice() {
+  const st = weekStats();
+  const shortAvg = GOAL - st.avgDur;
+  $('#adv-tiles').innerHTML =
+    tile('平均睡眠', fmtDur(st.avgDur), shortAvg > 0 ? `目標まで ${fmtDur(shortAvg)}` : '目標達成', shortAvg > 0 ? '' : 'up') +
+    tile('平均就寝', relToClock(st.avgBedRel), st.weekendDiff != null ? `休日は ${st.weekendDiff >= 0 ? '+' : '−'}${Math.round(Math.abs(st.weekendDiff))}分` : '') +
+    tile('就寝のばらつき', fmtDur(st.range), `${relToClock(st.earliest)} 〜 ${relToClock(st.latest)}`);
+  const n0 = v => v == null ? null : Math.round(v);
+  const items = [
+    { prio: 'high', ptxt: '優先度 高', icon: ICON.clock, title: '就寝時刻をそろえる',
+      lead: st.weekendDiff != null && st.weekendDiff > 0
+        ? `休日は平日より約${n0(st.weekendDiff)}分遅く寝ています。就寝時刻のずれは体内時計を乱し、週明けの眠気や寝つきの悪さにつながります。`
+        : `今週の就寝時刻は ${relToClock(st.earliest)} 〜 ${relToClock(st.latest)} と幅があります。毎晩ほぼ同じ時刻に寝ると、眠りの質が安定します。`,
+      evid: [['平日の平均就寝', st.wdBed != null ? relToClock(st.wdBed) : '—'], ['休日の平均就寝', st.weBed != null ? relToClock(st.weBed) : '—'], ['ばらつき', fmtDur(st.range)]],
+      steps: ['毎晩 23:30 に「おやすみ通知」を受け取る（時刻は設定で変更できます）', '休日の起床も、平日より1時間以内の遅れにとどめる', '寝る時刻を先に決めて、入浴や片づけはそこから逆算する'] },
+    { prio: 'mid', ptxt: '優先度 中', icon: ICON.phone, title: '寝る前のスマホを30分早く手放す',
+      lead: st.phoneLat != null && st.noPhoneLat != null
+        ? `スマホを使った夜は寝つくまで平均${n0(st.phoneLat)}分、使わなかった夜は平均${n0(st.noPhoneLat)}分でした。画面の光と情報の刺激が入眠を遅らせます。`
+        : '画面の光と情報の刺激は入眠を遅らせます。就寝前30分はスマホから離れてみましょう。',
+      evid: [['スマホあり', st.phoneLat != null ? `寝つき ${n0(st.phoneLat)}分` : '記録なし'], ['スマホなし', st.noPhoneLat != null ? `寝つき ${n0(st.noPhoneLat)}分` : '記録なし']],
+      steps: ['就寝30分前に充電器に置き、寝室に持ち込まない', '夜はナイトモードにして明るさを最小にする', '代わりに軽いストレッチや紙の本を5分'] },
+    { prio: 'mid', ptxt: '優先度 中', icon: ICON.coffee, title: 'カフェインは14時まで',
+      lead: st.cafAwak != null && st.noCafAwak != null
+        ? `14時以降にカフェインをとった日は、夜中に平均${st.cafAwak.toFixed(1)}回目が覚めています（とらなかった日は${st.noCafAwak.toFixed(1)}回）。`
+        : 'カフェインの覚醒作用は5〜6時間続きます。午後の遅い時間のコーヒーやエナジードリンクは控えめに。',
+      evid: [['カフェインあり', st.cafAwak != null ? `中途覚醒 ${st.cafAwak.toFixed(1)}回` : '記録なし'], ['なし', st.noCafAwak != null ? `中途覚醒 ${st.noCafAwak.toFixed(1)}回` : '記録なし']],
+      steps: ['午後はデカフェ・麦茶・白湯に置き換える', 'カフェインの効果は5〜6時間続くことを意識する', '眠気対策は15分以内の昼寝で'] },
+    { prio: 'low', ptxt: '優先度 低', icon: ICON.sun, title: '朝の光で体内時計をリセット',
+      lead: '起床後30分以内に屋外の光を浴びると、夜に眠気が訪れるタイミングが安定します。曇りの日でも、屋内の照明より十分に明るい光です。',
+      evid: [['おすすめ', '起床後 30分以内'], ['目安', '5〜10分']],
+      steps: ['カーテンを開けて朝食をとる', '通勤・通学で一駅ぶん歩く', '在宅の日はベランダや窓際で数分過ごす'] },
+  ];
+  $('#adv-list').innerHTML = items.map((it, i) => `
+    <div class="card acc ${i === 0 ? 'open' : ''}">
+      <div class="acc-h" role="button" tabindex="0" data-action="acc" aria-expanded="${i === 0}">
+        <div class="acc-ic">${it.icon}</div>
+        <div class="acc-t"><div class="row1"><span class="prio ${it.prio}">${it.ptxt}</span></div><h3>${it.title}</h3><p>${it.lead}</p></div>
+        ${ICON.chev}
+      </div>
+      <div class="acc-body">
+        <h4>あなたの記録から</h4>
+        <div class="evid">${it.evid.map(([k, v]) => `<span><b>${k}</b>${v}</span>`).join('')}</div>
+        <h4>今夜からできること</h4>
+        <ul class="steps">${it.steps.map(s => `<li>${s}</li>`).join('')}</ul>
+      </div>
+    </div>`).join('');
+}
+
+// ---- 画面：履歴 ----
+function monthItems(st) {
+  return [
+    ...prevWeeks.map(w => ({ label: w.short, sub: '–' + w.label.split('–')[1], value: w.avgDur, bedRel: w.avgBedRel, wakeRel: w.avgBedRel + w.avgDur, met: w.met, title: `${w.label}：平均 ${fmtDur(w.avgDur)}`, range: w.label })),
+    { label: '10/10', sub: '今週', value: st.avgDur, bedRel: st.avgBedRel, wakeRel: st.avgBedRel + st.avgDur, met: st.met, title: `10/10–10/16：平均 ${fmtDur(st.avgDur)}`, range: '10/10–10/16' },
+  ];
+}
+function renderHistory() {
+  const st = weekStats();
+  const week = state.range === 'week';
+  $$('#h-range button').forEach(b => b.classList.toggle('on', b.dataset.value === state.range));
+  $('#h-period').textContent = week ? `${fmtMDW(records[0].date)} – ${fmtMDW(records[records.length - 1].date)}` : '直近4週間 ・ 9/19 – 10/16';
+  $('#h-rows-title').textContent = week ? '日別の記録' : '週ごとの記録';
+  $('#h-bars-hint').textContent = week ? 'タップして日を選択' : 'タップして週を選択';
+  const deltaChip = (v, vs) => `${v >= 0 ? ICON.up : ICON.down}${vs} ${v >= 0 ? '+' : '−'}${fmtDur(Math.abs(v))}`;
+  if (week) {
+    const dPrev = st.avgDur - prevWeeks[prevWeeks.length - 1].avgDur;
+    $('#h-tiles').innerHTML =
+      tile('平均睡眠時間', fmtDur(st.avgDur), deltaChip(dPrev, '先週比'), dPrev >= 0 ? 'up' : 'down') +
+      tile('目標達成', `${st.met}<span style="font-size:13px;color:var(--ink-3)"> / 7日</span>`, `目標 ${fmtDur(GOAL)} 以上`) +
+      tile('平均就寝', relToClock(st.avgBedRel), `${relToClock(st.earliest)} 〜 ${relToClock(st.latest)}`) +
+      tile('平均起床', fmtClock(st.avgWake), `${fmtClock(Math.min(...records.map(r => r.wake)))} 〜 ${fmtClock(Math.max(...records.map(r => r.wake)))}`);
+    const items = records.map(r => ({ label: DAYS[dateParts(r.date).dow], sub: fmtMD(r.date), value: dur(r), bedRel: bedRel(r), wakeRel: bedRel(r) + dur(r), title: `${fmtMDW(r.date)}：${fmtDur(dur(r))}` }));
+    state.selDay = Math.min(state.selDay, items.length - 1);
+    $('#h-bars').innerHTML = barChart(items, state.selDay, { label: '日別の睡眠時間' });
+    $('#h-rhythm').innerHTML = rhythmChart(items, state.selDay);
+    const r = records[state.selDay];
+    $('#h-detail').innerHTML = `<span><b>${fmtMDW(r.date)}</b> <span class="muted">${fmtClock(r.bed)} → ${fmtClock(r.wake)}</span></span><span><b>${fmtDur(dur(r))}</b> <span class="muted">・ スコア ${score(r)}</span></span>`;
+    $('#h-rows').innerHTML = records.map(rec => {
+      const d = dur(rec);
+      return `<div class="row"><div class="d">${fmtMD(rec.date)}<small>${DAYS[dateParts(rec.date).dow]}曜</small></div><div class="bar"><i style="width:${Math.min(100, d / 600 * 100)}%"></i><span class="g" style="left:${GOAL / 600 * 100}%"></span></div><div class="v">${fmtDur(d)}<small>${fmtClock(rec.bed)} → ${fmtClock(rec.wake)}</small></div>${faceSVG(rec.mood, 'facesvg')}</div>`;
+    }).join('');
+  } else {
+    const items = monthItems(st);
+    const avg4 = mean(items.map(i => i.value)), met4 = items.reduce((s, i) => s + i.met, 0);
+    const avgBed4 = mean(items.map(i => i.bedRel)), avgWake4 = mean(items.map(i => i.wakeRel));
+    $('#h-tiles').innerHTML =
+      tile('平均睡眠時間', fmtDur(avg4), `最も良い週 ${fmtDur(Math.max(...items.map(i => i.value)))}`) +
+      tile('目標達成', `${met4}<span style="font-size:13px;color:var(--ink-3)"> / 28日</span>`, `目標 ${fmtDur(GOAL)} 以上`) +
+      tile('平均就寝', relToClock(avgBed4), `${relToClock(Math.min(...items.map(i => i.bedRel)))} 〜 ${relToClock(Math.max(...items.map(i => i.bedRel)))}`) +
+      tile('平均起床', relToClock(avgWake4), `${relToClock(Math.min(...items.map(i => i.wakeRel)))} 〜 ${relToClock(Math.max(...items.map(i => i.wakeRel)))}`);
+    state.selWeek = Math.min(state.selWeek, items.length - 1);
+    $('#h-bars').innerHTML = barChart(items, state.selWeek, { label: '週ごとの平均睡眠時間' });
+    $('#h-rhythm').innerHTML = rhythmChart(items, state.selWeek);
+    const it = items[state.selWeek];
+    $('#h-detail').innerHTML = `<span><b>${it.range}</b></span><span><b>平均 ${fmtDur(it.value)}</b> <span class="muted">・ 達成 ${it.met}/7日</span></span>`;
+    $('#h-rows').innerHTML = items.map(w => `<div class="row"><div class="d">${w.label}<small>${w.sub === '今週' ? '今週' : w.sub}</small></div><div class="bar"><i style="width:${Math.min(100, w.value / 600 * 100)}%"></i><span class="g" style="left:${GOAL / 600 * 100}%"></span></div><div class="v">${fmtDur(w.value)}<small>達成 ${w.met}/7日</small></div><span></span></div>`).join('');
+  }
+}
+
+// ---- ナビゲーション／レイアウト ----
+const state = { screen: 'home', range: 'week', selDay: records.length - 1, selWeek: 3, layout: 'single' };
+function go(name) {
+  state.screen = name;
+  $$('#viewer-chips .vchip').forEach(t => t.classList.toggle('on', t.dataset.screen === name));
+  if (state.layout === 'gallery') {
+    const slot = $(`.slot[data-screen="${name}"]`);
+    if (slot) slot.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    return;
+  }
+  $$('.screen').forEach(s => { const on = s.dataset.screen === name; s.classList.toggle('active', on); if (on) s.scrollTop = 0; });
+  $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.screen === name));
+}
+function setLayout(mode) {
+  if (mode === state.layout) return;
+  state.layout = mode;
+  $$('#layout-seg button').forEach(b => b.classList.toggle('on', b.dataset.value === mode));
+  const stage = $('#stage'), mainScreens = $('#screens'), order = ['home', 'record', 'advice', 'history'];
+  if (mode === 'gallery') {
+    stage.classList.add('gallery');
+    order.forEach((name, i) => {
+      const scr = $(`.screen[data-screen="${name}"]`);
+      scr.classList.add('active'); scr.scrollTop = 0;
+      let slot = $('#main-slot');
+      if (i > 0) {
+        slot = document.createElement('div'); slot.className = 'slot';
+        const ph = $('#main-phone').cloneNode(true);
+        ph.removeAttribute('id');
+        const scrs = ph.querySelector('.screens'); scrs.replaceChildren(); scrs.removeAttribute('id');
+        ph.querySelectorAll('.toast').forEach(t => t.remove());
+        slot.appendChild(ph); stage.appendChild(slot);
+        scrs.appendChild(scr);
+      }
+      slot.dataset.screen = name;
+      slot.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.screen === name));
+      const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = TITLES[name]; slot.appendChild(cap);
+    });
+  } else {
+    stage.classList.remove('gallery');
+    order.forEach(name => mainScreens.appendChild($(`.screen[data-screen="${name}"]`)));
+    $$('.slot').forEach(s => { if (s.id !== 'main-slot') s.remove(); else { s.querySelector('.cap')?.remove(); delete s.dataset.screen; } });
+    go(state.screen);
+  }
+  fit();
+}
+function fit() {
+  const native = window.innerWidth <= 480;
+  document.body.classList.toggle('native', native);
+  const slots = $$('.slot');
+  if (native) { slots.forEach(s => { s.style.width = ''; s.style.height = ''; $('.phone', s).style.transform = ''; }); return; }
+  const barH = $('.mockbar').offsetHeight;
+  const availH = window.innerHeight - barH - 66 - (state.layout === 'gallery' ? 34 : 0);
+  const availW = window.innerWidth - 40;
+  let s = Math.min(1, availH / 844, availW / 390);
+  if (state.layout === 'gallery') s = Math.max(0.55, Math.min(s, 0.86, (availW - 3 * 36) / (4 * 390)));
+  s = Math.max(s, 0.35);
+  slots.forEach(slot => { slot.style.width = (390 * s) + 'px'; slot.style.height = (844 * s) + 'px'; $('.phone', slot).style.transform = `scale(${s})`; });
+}
+function showToast(msg, phone) {
+  phone = phone || $('#main-phone');
+  let t = phone.querySelector('.toast');
+  if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); phone.appendChild(t); }
+  t.innerHTML = `${ICON.checkCircle}${esc(msg)}`;
+  t.classList.add('show');
+  clearTimeout(t._tm); t._tm = setTimeout(() => t.classList.remove('show'), 1800);
+}
+function renderAll() { renderHome(); renderAdvice(); renderHistory(); renderForm(); }
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-action]'); if (!el) return;
+  switch (el.dataset.action) {
+    case 'tab': case 'goto': go(el.dataset.screen); break;
+    case 'layout': setLayout(el.dataset.value); break;
+    case 'step': { const f = el.dataset.field; form[f] = norm(form[f] + Number(el.dataset.delta)); renderForm(); break; }
+    case 'pick': form[el.dataset.group] = Number(el.dataset.value); renderForm(); break;
+    case 'habit': { const v = el.dataset.value; form.habits.has(v) ? form.habits.delete(v) : form.habits.add(v); renderForm(); break; }
+    case 'save': saveForm(el.closest('.phone')); break;
+    case 'acc': { const acc = el.closest('.acc'); const open = acc.classList.toggle('open'); el.setAttribute('aria-expanded', open); break; }
+    case 'range': state.range = el.dataset.value; renderHistory(); break;
+    case 'selday': if (state.range === 'week') state.selDay = Number(el.dataset.idx); else state.selWeek = Number(el.dataset.idx); renderHistory(); break;
+  }
+});
+$('#f-memo').addEventListener('input', e => { form.memo = e.target.value; });
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[role="button"][data-action]')) { e.preventDefault(); e.target.click(); }
+});
+window.addEventListener('resize', fit);
+
+loadForm();
+renderAll();
+go('home');
+fit();
+</script>
+</body>
+</html>

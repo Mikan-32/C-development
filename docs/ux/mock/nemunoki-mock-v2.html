@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ねむのき — 画面モック v2（PRD 準拠・LVGL で作る前提）</title>
+<!-- 生成元：docs/ux/UX-1〜8。v1 の CSS（デザイントークン）を引き継ぎ、LVGL で再現しにくいグラデーション・ぼかしを外した -->
+<style>
+
+:root{
+  --bg:#0E1330; --bg-2:#141A3D;
+  --card:#1A2147; --card-2:#232B5A; --card-3:#2C356E;
+  --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.16);
+  --ink:#F2F3FA; --ink-2:#B8BCD8; --ink-3:#9298C2;
+  --brand:#F08CA8; --brand-deep:#E36F91; --brand-ink:#2A1222;
+  --series:#7788EE; --series-soft:rgba(119,136,238,.22);
+  --good:#5FD3A8; --warn:#F2C26B; --serious:#F09A6A; --bad:#F06A6A;
+  --radius:20px; --radius-s:14px;
+  --font:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Noto Sans CJK JP","Yu Gothic UI",YuGothic,Meiryo,system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{font-family:var(--font);background:#070A1C;color:var(--ink);font-feature-settings:"palt";-webkit-font-smoothing:antialiased;line-height:1.5;overflow-x:hidden}
+button{font-family:inherit;color:inherit}
+button:focus-visible,textarea:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* ===== viewer chrome (outside the phone) ===== */
+.mockbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:10px 18px;background:rgba(7,10,28,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line);min-height:54px}
+.mockbar .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;letter-spacing:.02em;white-space:nowrap}
+.mockbar .brand svg{width:24px;height:24px}
+.mockbar .brand small{font-weight:600;color:var(--ink-3);margin-left:4px;font-size:12px}
+.mockbar .chips{display:flex;gap:6px;margin-left:auto}
+.mockbar .vchip{border:1px solid transparent;background:transparent;color:var(--ink-2);font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer}
+.mockbar .vchip.on{background:var(--card-2);color:var(--ink);border-color:var(--line-2)}
+.mockbar .seg{display:flex;border:1px solid var(--line-2);border-radius:999px;overflow:hidden;margin-left:10px}
+.mockbar .seg button{border:0;background:transparent;color:var(--ink-2);font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer}
+.mockbar .seg button.on{background:var(--brand);color:var(--brand-ink)}
+.stage{display:flex;justify-content:center;align-items:flex-start;gap:36px;padding:26px 20px 40px}
+.stage.gallery{justify-content:flex-start;overflow-x:auto;scroll-snap-type:x proximity}
+.slot{flex:none;position:relative;scroll-snap-align:center}
+.slot .cap{position:absolute;left:0;right:0;bottom:-30px;text-align:center;font-size:12px;color:var(--ink-3);font-weight:600}
+
+/* ===== phone ===== */
+.phone{position:relative;width:390px;height:844px;border-radius:48px;background:var(--bg);box-shadow:0 0 0 10px #171B30,0 0 0 12px #2B3050,0 40px 90px rgba(0,0,0,.65);overflow:hidden;transform-origin:top left;display:flex;flex-direction:column;isolation:isolate}
+.phone::before{content:"";position:absolute;inset:0;background:radial-gradient(130% 42% at 50% -8%,#2A3072 0%,rgba(42,48,114,0) 60%);pointer-events:none;z-index:0}
+.notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:122px;height:34px;background:#05070F;border-radius:20px;z-index:4}
+.statusbar{height:56px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 30px 8px;font-size:15px;font-weight:700;position:relative;z-index:2;letter-spacing:.01em}
+.statusbar .icons{display:flex;gap:6px;align-items:center}
+.statusbar svg{height:12px;width:auto;display:block}
+.screens{flex:1;min-height:0;position:relative;z-index:1}
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding:6px 16px 28px;display:none;scrollbar-width:none;overscroll-behavior:contain}
+.screen::-webkit-scrollbar{display:none}
+.screen.active{display:block;animation:fade .26s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.screen.active{animation:none}}
+.tabbar{flex:none;height:86px;display:flex;justify-content:space-around;align-items:flex-start;padding:9px 10px 0;background:rgba(14,19,48,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);position:relative;z-index:2}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;width:76px;color:var(--ink-3);font-size:11px;font-weight:700;background:none;border:0;padding:4px 0;cursor:pointer;border-radius:12px}
+.tab.active{color:var(--brand)}
+.tab svg{width:26px;height:26px}
+.home-indicator{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:3px;background:rgba(255,255,255,.35);z-index:3}
+.toast{position:absolute;left:50%;bottom:106px;transform:translateX(-50%) translateY(10px);background:#F2F3FA;color:#141A3D;padding:10px 16px;border-radius:999px;font-weight:700;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:6;box-shadow:0 10px 30px rgba(0,0,0,.45);display:flex;gap:8px;align-items:center;white-space:nowrap}
+.toast svg{width:18px;height:18px;color:#1D9E6E}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ===== shared components ===== */
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;border:1px solid var(--line);position:relative}
+.card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
+.card-h h2{font-size:15px;font-weight:800;margin:0}
+.hint{font-size:12px;color:var(--ink-3)}
+.link{color:var(--brand);font-size:13px;font-weight:700;background:none;border:0;padding:0;cursor:pointer;display:inline-flex;align-items:center;gap:2px}
+.link svg{width:14px;height:14px}
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:54px;border-radius:18px;background:linear-gradient(135deg,#F5A2B9,#E8769A);color:var(--brand-ink);font-weight:800;font-size:16px;border:0;box-shadow:0 10px 26px rgba(240,140,168,.28);cursor:pointer;margin-top:4px}
+.btn-primary svg{width:20px;height:20px}
+.btn-primary:active{transform:scale(.985)}
+.muted{color:var(--ink-3)} .sub{color:var(--ink-2)}
+.screen-title{display:flex;align-items:flex-end;justify-content:space-between;padding:12px 0 12px;gap:10px}
+.screen-title h1{font-size:24px;font-weight:800;margin:0;letter-spacing:.01em;line-height:1.2}
+.screen-title .date{font-size:12px;color:var(--ink-2);text-align:right;line-height:1.4}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap}
+.pill svg{width:12px;height:12px}
+.pill.good{background:rgba(95,211,168,.16);color:var(--good)}
+.pill.warn{background:rgba(242,194,107,.16);color:var(--warn)}
+.pill.serious{background:rgba(240,154,106,.18);color:var(--serious)}
+.pill.neutral{background:rgba(255,255,255,.08);color:var(--ink-2)}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tiles2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.tile{background:var(--card-2);border-radius:14px;padding:10px 11px;min-width:0}
+.tiles .tile{padding:10px 8px}
+.tile .k{font-size:11px;color:var(--ink-3);white-space:nowrap}
+.tile .v{font-size:18px;font-weight:800;margin-top:2px;line-height:1.2;white-space:nowrap}
+.tiles .tile .v{font-size:16px}
+.tile .d{font-size:11px;margin-top:3px;color:var(--ink-3);display:flex;align-items:center;gap:3px;white-space:nowrap}
+.tile .d.up{color:var(--good)} .tile .d.down{color:var(--serious)}
+.tile .d svg{width:11px;height:11px}
+
+/* ===== home ===== */
+.home-top{display:flex;align-items:center;justify-content:space-between;padding:10px 0 12px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:18px;letter-spacing:.03em}
+.logo svg{width:28px;height:28px}
+.avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#3B4390,#7788EE);display:grid;place-items:center;font-weight:800;font-size:15px;border:2px solid rgba(255,255,255,.12)}
+.greet{font-size:22px;font-weight:800;margin:0 0 2px;line-height:1.3}
+.score-card{display:grid;grid-template-columns:128px 1fr;gap:16px;align-items:center}
+.ring{position:relative;width:128px;height:128px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .num{font-size:40px;font-weight:800;line-height:1}
+.ring .lbl{font-size:11px;color:var(--ink-3);margin-top:3px;font-weight:600}
+.score-side .k{font-size:12px;color:var(--ink-3)}
+.score-side .big{font-size:28px;font-weight:800;line-height:1.15;margin:2px 0 6px}
+.score-side .times{font-size:13px;color:var(--ink-2);display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+.score-side .times svg{width:14px;height:14px;color:var(--ink-3)}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat3 .s{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 8px;text-align:center}
+.stat3 .k{font-size:11px;color:var(--ink-3)} .stat3 .v{font-size:16px;font-weight:800;margin-top:2px;display:flex;justify-content:center;align-items:center;gap:5px}
+.stat3 .v svg{width:20px;height:20px}
+.advice-card{background:linear-gradient(135deg,rgba(240,140,168,.16),rgba(119,136,238,.12)),var(--card);border-color:rgba(240,140,168,.25)}
+.advice-card .tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:var(--brand);letter-spacing:.06em;margin-bottom:6px}
+.advice-card .tag svg{width:14px;height:14px}
+.advice-card h3{font-size:17px;font-weight:800;margin:0 0 6px;line-height:1.35}
+.advice-card p{margin:0 0 10px;font-size:13px;color:var(--ink-2);line-height:1.6}
+.plot>svg{display:block;width:100%;height:auto;font-family:var(--font)}
+.plot .hit{cursor:pointer}
+
+/* ===== record ===== */
+.field{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
+.field+.field{border-top:1px solid var(--line)}
+.field .k{font-size:14px;color:var(--ink-2);display:flex;align-items:center;gap:8px;font-weight:600}
+.field .k svg{width:18px;height:18px;color:var(--ink-3)}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper .t{font-size:26px;font-weight:800;min-width:76px;text-align:center;font-variant-numeric:tabular-nums}
+.stepper button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line-2);background:var(--card-2);color:var(--ink);font-size:20px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
+.stepper button:active{background:var(--card-3)}
+.dur-line{display:flex;justify-content:space-between;align-items:center;background:var(--card-2);border-radius:14px;padding:10px 14px;margin-top:10px}
+.dur-line strong{font-size:18px;font-weight:800}
+.q{font-size:13px;color:var(--ink-2);margin:12px 0 8px;font-weight:600}
+.q:first-of-type{margin-top:0}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 13px;border-radius:999px;background:var(--card-2);border:1px solid transparent;color:var(--ink-2);font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;line-height:1.3}
+.chip svg{width:16px;height:16px}
+.chip .ck{display:none;width:14px;height:14px}
+.chip.on{background:rgba(240,140,168,.16);border-color:var(--brand);color:var(--ink)}
+.chip.on .ck{display:block;color:var(--brand)}
+.seg4{display:grid;grid-template-columns:repeat(4,1fr);background:var(--card-2);border-radius:12px;padding:3px;gap:3px}
+.seg4 button{border:0;background:transparent;color:var(--ink-2);padding:9px 0;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer}
+.seg4 button.on{background:#3A4596;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.moods{display:flex;justify-content:space-between;gap:2px}
+.mood{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;color:var(--ink-3);font-size:11px;font-weight:600;cursor:pointer;flex:1;padding:4px 0;border-radius:12px}
+.mood svg{width:42px;height:42px}
+.mood .face{fill:var(--card-2);stroke:var(--ink-3);stroke-width:1.6}
+.mood .eye{fill:var(--ink-3)} .mood .mouth{fill:none;stroke:var(--ink-3);stroke-width:2;stroke-linecap:round}
+.mood.on{color:var(--ink)}
+.mood.on .face{fill:var(--brand);stroke:var(--brand)} .mood.on .eye{fill:var(--brand-ink)} .mood.on .mouth{stroke:var(--brand-ink)}
+.facesvg .face{fill:var(--card-2);stroke:var(--ink-3);stroke-width:1.6}
+.facesvg .eye{fill:var(--ink-2)}
+.facesvg .mouth{fill:none;stroke:var(--ink-2);stroke-width:2;stroke-linecap:round}
+textarea{width:100%;min-height:76px;border-radius:14px;border:1px solid var(--line-2);background:var(--card-2);color:var(--ink);padding:10px 12px;font:inherit;font-size:14px;resize:none;display:block}
+textarea::placeholder{color:var(--ink-3)}
+.disclaimer{font-size:11px;color:var(--ink-3);padding:6px 4px 10px;line-height:1.7;margin:0}
+
+/* ===== advice ===== */
+.acc .acc-h{display:flex;gap:12px;align-items:flex-start;cursor:pointer;width:100%;background:none;border:0;color:inherit;text-align:left;padding:0;border-radius:12px}
+.acc .acc-h:focus-visible{outline:2px solid var(--brand);outline-offset:4px}
+.acc-ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none;background:var(--series-soft);color:#C3CAFF}
+.acc-ic svg{width:22px;height:22px}
+.acc-t{flex:1;min-width:0}
+.acc-t .row1{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.acc-t h3{font-size:15px;font-weight:800;margin:0;line-height:1.35}
+.acc-t p{margin:3px 0 0;font-size:13px;color:var(--ink-2);line-height:1.6}
+.prio{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;flex:none}
+.prio.high{background:rgba(240,154,106,.18);color:var(--serious)}
+.prio.mid{background:rgba(242,194,107,.16);color:var(--warn)}
+.prio.low{background:rgba(119,136,238,.2);color:#B7BEFF}
+.chev{width:20px;height:20px;color:var(--ink-3);flex:none;transition:transform .2s;margin-top:2px}
+.acc.open .chev{transform:rotate(180deg)}
+.acc-body{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--ink-2)}
+.acc.open .acc-body{display:block}
+.acc-body h4{font-size:12px;color:var(--ink-3);margin:0 0 6px;font-weight:800;letter-spacing:.04em}
+.acc-body h4+h4{margin-top:12px}
+.evid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.evid span{background:var(--card-2);border-radius:10px;padding:6px 10px;font-size:12px;color:var(--ink)}
+.evid span b{color:var(--ink-3);font-weight:600;margin-right:5px}
+.steps{margin:0;padding:0;list-style:none}
+.steps li{display:flex;gap:9px;padding:6px 0;line-height:1.55;color:var(--ink)}
+.steps li::before{content:"";width:18px;height:18px;border-radius:50%;border:1.5px solid var(--brand);flex:none;margin-top:2px}
+
+/* ===== history ===== */
+.seg2{display:inline-grid;grid-template-columns:1fr 1fr;background:var(--card);border-radius:12px;padding:3px;gap:3px;border:1px solid var(--line)}
+.seg2 button{min-width:52px;border:0;background:transparent;color:var(--ink-2);padding:6px 0;border-radius:9px;font-weight:800;font-size:13px;cursor:pointer}
+.seg2 button.on{background:#3A4596;color:#fff}
+.period{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px;color:var(--ink-2);font-size:13px;font-weight:600}
+.period button{width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink-2);cursor:pointer;display:grid;place-items:center;padding:0}
+.period button:disabled{opacity:.35;cursor:default}
+.period button svg{width:16px;height:16px}
+.day-detail{display:flex;justify-content:space-between;align-items:center;background:var(--card-2);border-radius:12px;padding:9px 12px;margin-top:10px;font-size:13px;gap:8px}
+.day-detail b{font-weight:800}
+.rows .row{display:grid;grid-template-columns:58px 1fr 100px 26px;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+.rows .row:first-child{border-top:0;padding-top:2px}
+.rows .row .d{font-weight:700} .rows .row .d small{display:block;font-size:11px;color:var(--ink-3);font-weight:600}
+.rows .bar{height:6px;border-radius:3px;background:var(--series-soft);position:relative}
+.rows .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--series)}
+.rows .bar .g{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--ink-3)}
+.rows .v{font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.rows .v small{display:block;font-size:11px;color:var(--ink-3);font-weight:600}
+.rows .row svg{width:26px;height:26px}
+
+@media (max-width:900px){.mockbar .brand small{display:none}}
+@media (max-width:680px){.mockbar .chips{display:none}.mockbar .seg{margin-left:auto}}
+
+
+/* ===== v2：LVGL で再現しやすい形に寄せる（グラデーション・ぼかしを使わない） ===== */
+.phone::before{display:none}
+.tabbar{background:#121838;backdrop-filter:none;-webkit-backdrop-filter:none}
+.advice-card{background:#24204A;border-color:rgba(240,140,168,.28)}
+.btn-primary{background:var(--brand);box-shadow:none}
+.mockbar{backdrop-filter:none;-webkit-backdrop-filter:none;background:#070A1C}
+.gallery{display:flex;flex-wrap:wrap;gap:46px 34px;padding:26px 24px 70px;justify-content:center}
+.slot2{position:relative;width:calc(390px * var(--s,0.7));height:calc(844px * var(--s,0.7) + 38px);flex:none}
+.slot2 .phone{transform:scale(var(--s,0.7));transform-origin:top left}
+.cap2{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:12.5px;color:var(--ink-2);font-weight:700;line-height:1.35}
+.cap2 b{color:var(--brand);margin-right:6px;font-weight:800}
+.mockbar .note{margin-left:auto;font-size:12px;color:var(--ink-3)}
+.mockbar label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.show-lv [data-lv]{outline:1px dashed rgba(119,136,238,.75);outline-offset:-1px;position:relative}
+.show-lv [data-lv]::after{content:attr(data-lv);position:absolute;right:4px;top:-9px;background:#7788EE;color:#0E1330;font-size:9.5px;font-weight:800;padding:1px 5px;border-radius:6px;z-index:5;white-space:nowrap}
+.icon-btn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:1px solid var(--line);color:var(--ink-2)}
+.icon-btn svg{width:20px;height:20px}
+.subhead{display:flex;align-items:center;gap:10px;padding:8px 0 12px}
+.subhead h1{font-size:20px;margin:0;font-weight:800}
+.progress{height:6px;border-radius:3px;background:var(--card-2);margin:8px 0 14px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--brand);border-radius:3px}
+.step-lbl{font-size:12px;color:var(--ink-3);font-weight:700}
+.btn-ghost{display:flex;align-items:center;justify-content:center;width:100%;height:48px;border-radius:16px;background:transparent;border:1px solid var(--line-2);color:var(--ink-2);font-weight:800;font-size:15px;margin-top:10px}
+.btn-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-pair .btn-ghost,.btn-pair .btn-primary{margin-top:0;height:56px}
+.btn-serious{display:flex;align-items:center;justify-content:center;width:100%;height:48px;border-radius:16px;background:transparent;border:1px solid var(--serious);color:var(--serious);font-weight:800;font-size:15px;margin-top:10px}
+.list-i{display:flex;gap:12px;padding:11px 0;border-top:1px solid var(--line);align-items:flex-start}
+.list-i:first-child{border-top:0;padding-top:2px}
+.list-i .ic{width:34px;height:34px;border-radius:11px;background:var(--series-soft);color:#C3CAFF;display:grid;place-items:center;flex:none}
+.list-i .ic svg{width:19px;height:19px}
+.list-i b{display:block;font-size:14px;margin-bottom:2px}
+.list-i span{font-size:13px;color:var(--ink-2);line-height:1.55}
+.banner{display:flex;gap:10px;align-items:flex-start;border-radius:16px;padding:11px 12px;margin-bottom:12px;background:rgba(119,136,238,.14);border:1px solid rgba(119,136,238,.32)}
+.banner.warn{background:rgba(242,194,107,.12);border-color:rgba(242,194,107,.35)}
+.banner.serious{background:rgba(240,154,106,.13);border-color:rgba(240,154,106,.4)}
+.banner .bi{width:22px;height:22px;flex:none;margin-top:1px;color:#AEB7FF}
+.banner.warn .bi{color:var(--warn)} .banner.serious .bi{color:var(--serious)}
+.banner .bt{flex:1;font-size:13px;line-height:1.5;color:var(--ink)}
+.banner .bt small{display:block;color:var(--ink-2);font-size:12px;margin-top:2px}
+.banner .link{margin-top:4px}
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.18);border-top-color:#AEB7FF;flex:none;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.tag-ref{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;border:1px dashed var(--ink-3);color:var(--ink-2)}
+.tag-est{display:inline-flex;padding:1px 6px;border-radius:6px;font-size:10.5px;font-weight:800;background:rgba(255,255,255,.07);color:var(--ink-3);margin-left:5px;vertical-align:1px}
+.hyp svg{display:block;width:100%;height:auto}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--ink-3);margin-top:6px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.qline{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--ink-2);margin-top:10px;gap:8px}
+.qbar{height:6px;border-radius:3px;background:var(--card-2);position:relative;overflow:hidden;margin-top:6px}
+.qbar i{position:absolute;top:0;bottom:0;background:var(--series);border-radius:3px}
+.qbar s{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,rgba(240,154,106,.85) 0 3px,transparent 3px 6px)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:0 10px;font-size:13.5px}
+.kv div{padding:8px 0;border-top:1px solid var(--line)}
+.kv div:nth-child(-n+2){border-top:0}
+.kv .k{color:var(--ink-2)} .kv .v{font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.kv .v small{font-weight:600;color:var(--ink-3)}
+.parts .p{display:grid;grid-template-columns:62px 1fr 52px;align-items:center;gap:10px;font-size:12.5px;padding:5px 0}
+.parts .p .k{color:var(--ink-2)}
+.parts .p .bar{height:8px;border-radius:4px;background:var(--card-2);position:relative}
+.parts .p .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--good)}
+.parts .p.low .bar i{background:var(--warn)}
+.parts .p .v{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+.parts .hint-low{font-size:12px;color:var(--warn);margin-top:6px;font-weight:700}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal .dw{font-size:11px;color:var(--ink-3);font-weight:700;padding-bottom:4px}
+.cal .d{height:38px;border-radius:10px;font-size:13px;font-weight:700;color:var(--ink-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.cal .d.sel{background:#3A4596;color:#fff}
+.cal .d i{width:6px;height:6px;border-radius:50%;display:block}
+.cal .d i.ok{background:var(--series)} .cal .d i.ins{background:var(--ink-3)} .cal .d i.fail{border:1.5px solid var(--ink-3);width:7px;height:7px;box-sizing:border-box}
+.cal .d.out{opacity:.3}
+.calhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:800}
+.sound-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.snd{background:var(--card-2);border-radius:14px;padding:11px 12px;border:1px solid transparent;display:flex;align-items:center;gap:10px;min-height:52px}
+.snd .si{width:30px;height:30px;border-radius:10px;background:rgba(255,255,255,.06);display:grid;place-items:center;color:var(--ink-2);flex:none}
+.snd .si svg{width:18px;height:18px}
+.snd b{font-size:13.5px;display:block}
+.snd small{font-size:11px;color:var(--ink-3)}
+.snd.on{border-color:var(--brand);background:rgba(240,140,168,.13)}
+.snd.on .si{color:var(--brand)}
+.eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-left:auto}
+.eq i{width:3px;background:var(--brand);border-radius:2px}
+.ctrl{display:flex;align-items:center;gap:14px;margin-top:12px}
+.play{width:52px;height:52px;border-radius:50%;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;flex:none}
+.play svg{width:22px;height:22px}
+.range{flex:1;height:6px;border-radius:3px;background:var(--card-3);position:relative}
+.range i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--brand)}
+.range b{position:absolute;top:50%;width:22px;height:22px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.vol-ic{width:20px;height:20px;color:var(--ink-3);flex:none}
+.alarm-row{display:flex;align-items:center;justify-content:space-between}
+.alarm-row .t{font-size:40px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.alarm-row .t small{font-size:13px;color:var(--ink-3);font-weight:700;margin-left:6px}
+.sw{width:52px;height:32px;border-radius:16px;background:var(--card-3);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#C9CCE3;transition:left .2s}
+.sw.on{background:var(--good)} .sw.on::after{left:23px;background:#fff}
+.checks{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.checks div{display:flex;align-items:center;gap:8px;color:var(--ink-2)}
+.checks svg{width:16px;height:16px;color:var(--good);flex:none}
+.checks .w svg{color:var(--warn)}
+.night{background:var(--night,#05070F)!important}
+.night .screen{color:#8A7F9E}
+.nclock{font-size:84px;font-weight:300;text-align:center;letter-spacing:.02em;color:#8A7F9E;margin-top:92px;line-height:1;font-variant-numeric:tabular-nums}
+.nsub{text-align:center;font-size:14px;margin-top:10px;color:#6E6585}
+.nrow{display:flex;justify-content:space-between;align-items:center;border:1px solid rgba(138,127,158,.22);border-radius:16px;padding:12px 14px;margin-top:14px;font-size:14px;color:#8A7F9E}
+.nrow b{color:#8A7F9E}
+.longpress{margin-top:28px;height:58px;border-radius:29px;border:1.5px solid rgba(138,127,158,.45);display:flex;align-items:center;justify-content:center;gap:10px;color:#8A7F9E;font-weight:700;font-size:15px;position:relative}
+.longpress .ringp{width:26px;height:26px;border-radius:50%;border:2.5px solid rgba(138,127,158,.35);border-top-color:#8A7F9E}
+.ring-alarm{font-size:96px;font-weight:300;text-align:center;line-height:1;margin-top:70px;color:#F2F3FA;font-variant-numeric:tabular-nums}
+.alarm-stop{position:absolute;left:16px;right:16px;bottom:30px;height:220px;border-radius:32px;background:var(--brand);color:var(--brand-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:28px;font-weight:800;gap:6px}
+.alarm-stop small{font-size:13px;font-weight:700;opacity:.8}
+.snooze{margin:26px auto 0;width:82%;height:56px;border-radius:28px;background:rgba(255,255,255,.08);border:1px solid var(--line-2);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:var(--ink)}
+.opres{display:flex;align-items:center;gap:10px;background:var(--card-2);border-radius:12px;padding:10px 12px;font-size:13px;margin-top:10px}
+.opres svg{width:18px;height:18px;flex:none}
+.opres.ok svg{color:var(--good)} .opres.fail{border:1px solid rgba(240,154,106,.45)} .opres.fail svg{color:var(--serious)}
+.opres.unk{border:1px solid rgba(242,194,107,.4)} .opres.unk svg{color:var(--warn)}
+.opres .grow{flex:1;line-height:1.45} .opres .grow small{display:block;color:var(--ink-3);font-size:11.5px}
+.curtain-viz{height:120px;border-radius:14px;background:#2A3772;position:relative;overflow:hidden;border:1px solid var(--line-2)}
+.curtain-viz::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;background:rgba(14,19,48,.5)}
+.curtain-viz .rail{position:absolute;left:0;right:0;top:0;height:8px;background:#4B568F}
+.curtain-viz .pnl{position:absolute;top:8px;bottom:0;background:repeating-linear-gradient(90deg,#C7798F 0 10px,#B86A81 10px 20px)}
+.curtain-viz .l{left:0} .curtain-viz .r{right:0}
+.pos{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px}
+.pos b{font-size:20px}
+.sched{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.sched:first-of-type{border-top:0}
+.sched .t{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.dim{opacity:.45}
+.log{font-size:12.5px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px}
+.log div{display:flex;gap:8px} .log time{color:var(--ink-3);min-width:74px;font-variant-numeric:tabular-nums}
+.sheet-bg{position:absolute;inset:0;background:rgba(5,7,15,.62);z-index:3}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--bg-2,#141A3D);border-radius:26px 26px 0 0;padding:10px 18px 30px;z-index:4;border-top:1px solid var(--line-2)}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--line-2);margin:0 auto 12px}
+.sheet h2{font-size:19px;margin:0 0 4px;font-weight:800}
+.olist{margin:10px 0 12px;padding:0;list-style:none;counter-reset:o}
+.olist li{display:flex;gap:10px;padding:8px 0;font-size:14px;line-height:1.5;border-top:1px solid var(--line)}
+.olist li:first-child{border-top:0}
+.olist li::before{counter-increment:o;content:counter(o);width:24px;height:24px;border-radius:50%;background:var(--series-soft);color:#C3CAFF;font-weight:800;font-size:12.5px;display:grid;place-items:center;flex:none;margin-top:1px}
+.field2{background:var(--card-2);border:1px solid var(--line-2);border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:10px;margin-top:6px}
+.field2 .val{flex:1;font-family:ui-monospace,Menlo,monospace;font-size:14px;letter-spacing:.06em;color:var(--ink)}
+.field2 .paste{font-size:13px;font-weight:800;color:var(--brand);border:1px solid rgba(240,140,168,.5);border-radius:10px;padding:6px 10px}
+.radio{display:flex;align-items:center;gap:10px;padding:11px 0;border-top:1px solid var(--line);font-size:14px}
+.radio:first-child{border-top:0}
+.radio .r{width:22px;height:22px;border-radius:50%;border:2px solid var(--ink-3);flex:none}
+.radio.on .r{border-color:var(--brand);box-shadow:inset 0 0 0 4px var(--card),inset 0 0 0 11px var(--brand)}
+.radio small{color:var(--ink-3);display:block;font-size:12px}
+.setrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line);font-size:14px;gap:10px}
+.setrow:first-child{border-top:0}
+.setrow small{display:block;color:var(--ink-3);font-size:12px;margin-top:2px;line-height:1.45}
+.setrow .val{color:var(--ink-2);font-size:13px;font-weight:700;white-space:nowrap}
+.empty{text-align:center;padding:18px 10px 6px}
+.empty svg{width:56px;height:56px;color:#5C66A8}
+.empty b{display:block;font-size:15px;margin:8px 0 4px}
+.empty span{font-size:13px;color:var(--ink-2)}
+.catalog-h{font-size:11.5px;font-weight:800;color:var(--ink-3);margin:14px 0 6px}
+.catalog-h:first-child{margin-top:2px}
+.ring.ref svg circle:last-child{stroke-dasharray:6 6!important}
+
+</style>
+</head>
+<body>
+<header class="mockbar">
+  <div class="brand"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M18.5 4.5a9.5 9.5 0 1 0 5 17.3A8 8 0 0 1 18.5 4.5z" fill="#F08CA8"/><path d="M9 25.5c0-3.2 1.6-5.2 4.5-6.1-1 1.4-1.5 3.3-1.5 6.1z" fill="#7788EE"/><path d="M9 25.5c0-3.2-1.6-5.2-4.5-6.1 1 1.4 1.5 3.3 1.5 6.1z" fill="#7788EE"/></svg>ねむのき<small>UIモック v2 ・ PRD 準拠 ・ LVGL で作る前提</small></div>
+  <span class="note">画面 ID は docs/ux/UX-2 の一覧と対応</span>
+  <label><input type="checkbox" id="lvtoggle"> LVGL の部品名を表示</label>
+</header>
+
+<main class="gallery" id="gallery">
+
+<!-- ON-02 同意 -->
+<div class="slot2"><div class="phone" data-tab="none"><div class="screens"><section class="screen active">
+  <div class="step-lbl" style="margin-top:6px">はじめの設定 2 / 4</div>
+  <div class="progress" data-lv="lv_bar"><i style="width:50%"></i></div>
+  <div class="screen-title" style="padding-top:2px"><h1>データの使い方</h1></div>
+  <p class="sub" style="margin:-4px 0 12px;font-size:13.5px">記録を始める前に、何を取得して、どう扱うかを確認してください。</p>
+  <div class="card">
+    <div class="list-i"><div class="ic" data-ic="phone"></div><div><b>取得するもの</b><span>体の動き（加速度センサー）、寝室の音の大きさといびき（マイク）、部屋の明るさ（ある端末のみ）</span></div></div>
+    <div class="list-i"><div class="ic" data-ic="spark"></div><div><b>使い道</b><span>眠りの記録、スコア、アドバイス、カーテンの設定の提案</span></div></div>
+    <div class="list-i"><div class="ic" data-ic="mic"></div><div><b>録音は保存しません</b><span>音は端末の中ですぐ数値に変え、元の音は捨てます</span></div></div>
+    <div class="list-i"><div class="ic" data-ic="lock"></div><div><b>この端末の中だけに保存</b><span>暗号化して保存し、サーバーには送りません。細かな計測値は 90 日で消えます</span></div></div>
+    <div class="list-i"><div class="ic" data-ic="trash"></div><div><b>いつでも削除・取り消し</b><span>設定の「データとプライバシー」から行えます</span></div></div>
+  </div>
+  <p class="disclaimer">ねむのきは医療機器ではなく、診断はしません。<span style="color:var(--brand);font-weight:700">プライバシーポリシーを読む</span></p>
+  <button class="btn-primary" data-lv="lv_button">同意して計測を使う</button>
+  <div class="btn-ghost">同意しないで続ける</div>
+</section></div></div><div class="cap2"><b>ON-02</b>初回：データの使い方と同意</div></div>
+
+<!-- HM-01 ホーム -->
+<div class="slot2"><div class="phone" data-tab="home"><div class="screens"><section class="screen active">
+  <div class="home-top"><div class="logo"><svg viewBox="0 0 28 28" aria-hidden="true"><path d="M18.5 4.5a9.5 9.5 0 1 0 5 17.3A8 8 0 0 1 18.5 4.5z" fill="#F08CA8"/><path d="M9 25.5c0-3.2 1.6-5.2 4.5-6.1-1 1.4-1.5 3.3-1.5 6.1z" fill="#7788EE"/><path d="M9 25.5c0-3.2-1.6-5.2-4.5-6.1 1 1.4 1.5 3.3 1.5 6.1z" fill="#7788EE"/></svg>ねむのき</div><div class="icon-btn" data-ic="gear" aria-label="設定"></div></div>
+  <p class="greet" style="font-size:20px">おはようございます</p>
+  <p class="sub" style="margin:0 0 12px;font-size:13px">10月31日（土）の朝</p>
+  <div class="card score-card" data-lv="lv_arc + lv_label">
+    <div class="ring" data-ring="82" data-tone="good"></div>
+    <div class="score-side"><div class="k">昨夜の睡眠時間</div><div class="big">6時間38分</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="pill good">● 良い</span><span class="pill neutral">前日比 +3・ほぼ変わらず</span></div>
+      <div class="times"><i data-ic="moon"></i>23:48<span class="muted">→</span><i data-ic="sun"></i>6:48</div></div>
+  </div>
+  <div class="stat3"><div class="s"><div class="k">寝つき</div><div class="v">28分</div></div><div class="s"><div class="k">中途覚醒</div><div class="v">2回・22分</div></div><div class="s"><div class="k">寝返り</div><div class="v">18回</div></div></div>
+  <div class="card" data-lv="nk_hypnogram">
+    <div class="card-h"><h2>眠りの帯<span class="tag-est">推定</span></h2><span class="link">この分析について ?</span></div>
+    <div class="hyp" data-hyp="ok"></div>
+    <div class="legend"><span><i style="background:#F2C26B"></i>覚醒</span><span><i style="background:#9AA6F5"></i>浅い眠り</span><span><i style="background:#4E5BC8"></i>深い眠り 1時間12分</span></div>
+    <div class="qline"><span>計測できた時間</span><b style="color:var(--ink)">7時間32分 / 7時間32分</b></div>
+    <div class="qbar"><i style="left:0;width:100%"></i></div>
+  </div>
+  <div class="card advice-card" data-lv="nk_advice_card">
+    <div class="tag"><i data-ic="spark"></i>今日のアドバイス</div>
+    <h3>寝る時刻をそろえてみませんか</h3>
+    <p>この 1 週間、寝ついた時刻は 22:50〜1:15 と、2時間25分の幅がありました。毎晩の時刻が近いほど、体内時計が整いやすくなります。</p>
+    <span class="link">すべてのアドバイスを見る</span>
+  </div>
+  <div class="card"><div class="kv"><div class="k">いびき<span class="tag-est">推定</span></div><div class="v">12分</div><div class="k">呼吸数<span class="tag-est">推定</span></div><div class="v">14回/分</div></div></div>
+  <button class="btn-primary">詳しく見る</button>
+</section></div></div><div class="cap2"><b>HM-01</b>ホーム（分析できた夜）</div></div>
+
+<!-- HM-01 データ不足 -->
+<div class="slot2"><div class="phone" data-tab="home"><div class="screens"><section class="screen active">
+  <div class="home-top"><div class="logo" style="font-size:16px">10月27日（火）の朝</div><div class="icon-btn" data-ic="gear"></div></div>
+  <div class="banner warn" data-lv="nk_banner"><i class="bi" data-ic="info"></i><div class="bt">1:40〜4:10 は計測できていません（アプリが停止しました）<small>計測できた時間が全体の 7 割に届かなかったため、スコアは参考値です</small><span class="link">理由と対策を見る</span></div></div>
+  <div class="card score-card">
+    <div class="ring ref" data-ring="61" data-tone="ref"></div>
+    <div class="score-side"><div class="k">昨夜の睡眠時間</div><div class="big" style="color:var(--ink-2)">約4時間20分</div>
+      <span class="tag-ref">参考値</span>
+      <div class="times"><i data-ic="moon"></i>23:50<span class="muted">→</span><i data-ic="sun"></i>6:40</div></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>眠りの帯<span class="tag-est">推定</span></h2></div>
+    <div class="hyp" data-hyp="gap"></div>
+    <div class="legend"><span><i style="background:#F2C26B"></i>覚醒</span><span><i style="background:#8E99E8"></i>眠り</span><span><i style="background:repeating-linear-gradient(45deg,#F09A6A 0 2px,transparent 2px 4px)"></i>計測できなかった時間</span></div>
+    <p class="hint" style="margin:8px 0 0">データが少ない夜は、浅い眠りと深い眠りを分けずに表示します。</p>
+    <div class="qline"><span>計測できた時間</span><b style="color:var(--ink)">4時間20分 / 6時間50分</b></div>
+    <div class="qbar"><i style="left:0;width:26.8%"></i><s style="left:26.8%;width:36.6%"></s><i style="left:63.4%;width:36.6%"></i></div>
+  </div>
+  <div class="card advice-card"><div class="tag"><i data-ic="spark"></i>今日のアドバイス</div><h3>スマホの置き場所を確かめてみませんか</h3><p>計測できた時間が少ない夜が続きました。枕元のマットレスの上に、充電しながら置くと、記録が安定しやすくなります。</p><span class="link">置き方を確かめる（10 秒）</span></div>
+</section></div></div><div class="cap2"><b>HM-01</b>ホーム（データ不足・欠損あり）</div></div>
+
+<!-- LG-01 履歴 -->
+<div class="slot2"><div class="phone" data-tab="history"><div class="screens"><section class="screen active">
+  <div class="screen-title"><h1>履歴</h1><div class="seg2"><button class="on">週</button><button>月</button></div></div>
+  <div class="card" data-lv="lv_calendar">
+    <div class="calhead"><span class="icon-btn" style="width:32px;height:32px" data-ic="left"></span>2026年10月<span class="icon-btn dim" style="width:32px;height:32px" data-ic="right"></span></div>
+    <div class="cal" id="cal"></div>
+    <div class="legend" style="margin-top:8px"><span><i style="background:#7788EE;border-radius:50%"></i>分析できた</span><span><i style="background:#9298C2;border-radius:50%"></i>参考値</span><span><i style="border:1.5px solid #9298C2;border-radius:50%"></i>取得できず</span></div>
+  </div>
+  <div class="tiles2"><div class="tile"><div class="k">平均睡眠時間</div><div class="v">6時間47分</div><div class="d">分析できた 6 夜</div></div><div class="tile"><div class="k">目標達成</div><div class="v">2<span style="font-size:13px;color:var(--ink-3)"> / 6夜</span></div><div class="d">目標 7時間 以上</div></div></div>
+  <div class="card" data-lv="lv_chart (bar)">
+    <div class="card-h"><h2>睡眠時間</h2><span class="hint">10/25〜10/31</span></div>
+    <div class="plot" id="bars"></div>
+  </div>
+</section></div></div><div class="cap2"><b>LG-01</b>履歴（カレンダーと比較グラフ）</div></div>
+
+<!-- LG-02 日別の詳細 -->
+<div class="slot2"><div class="phone" data-tab="history"><div class="screens"><section class="screen active">
+  <div class="subhead"><span class="icon-btn" data-ic="left"></span><div><h1 style="font-size:17px">10月30日（金）の夜 → 31日（土）の朝</h1></div></div>
+  <div class="card" data-lv="score parts">
+    <div class="card-h"><h2>スコア 82・良い</h2><span class="hint">項目ごとの点数</span></div>
+    <div class="parts">
+      <div class="p"><span class="k">睡眠時間</span><div class="bar"><i style="width:88%"></i></div><span class="v">26/30</span></div>
+      <div class="p"><span class="k">寝つき</span><div class="bar"><i style="width:80%"></i></div><span class="v">12/15</span></div>
+      <div class="p"><span class="k">連続性</span><div class="bar"><i style="width:98%"></i></div><span class="v">25/25</span></div>
+      <div class="p"><span class="k">効率</span><div class="bar"><i style="width:100%"></i></div><span class="v">15/15</span></div>
+      <div class="p low"><span class="k">規則性</span><div class="bar"><i style="width:25%"></i></div><span class="v">4/15</span></div>
+      <div class="hint-low">ここを整えると良さそう：寝ついた時刻が、いつもより 2 時間ずれていました</div>
+    </div>
+  </div>
+  <div class="card"><div class="card-h"><h2>眠りの帯と出来事</h2><span class="link">?</span></div><div class="hyp" data-hyp="detail"></div>
+    <div class="legend"><span>▲ 寝返り</span><span style="color:#F2C26B">● いびき</span><span style="color:#F08CA8">◆ サウンド・アラーム</span></div></div>
+  <div class="card"><div class="kv">
+    <div class="k">寝床にいた時間</div><div class="v">7時間32分</div>
+    <div class="k">睡眠時間</div><div class="v">6時間38分</div>
+    <div class="k">寝つき</div><div class="v">28分</div>
+    <div class="k">中途覚醒</div><div class="v">2回・22分</div>
+    <div class="k">睡眠効率</div><div class="v">88%</div>
+    <div class="k">深い眠り<span class="tag-est">推定</span></div><div class="v">1時間12分</div>
+    <div class="k">計測できた割合</div><div class="v">100%<small> ・置き方 OK</small></div>
+  </div></div>
+</section></div></div><div class="cap2"><b>LG-02</b>日別の詳細</div></div>
+
+<!-- NT-01 おやすみ -->
+<div class="slot2"><div class="phone" data-tab="night"><div class="screens"><section class="screen active">
+  <div class="screen-title"><h1>おやすみ</h1><div class="date">10月31日（土）<br>22:41</div></div>
+  <div class="card"><div class="checks"><div><i data-ic="check"></i>電池 64%・充電中</div><div><i data-ic="check"></i>マイク：いびきも記録します（録音は保存しません）</div><div class="w"><i data-ic="info"></i>枕元のマットレスの上に置いてください</div></div></div>
+  <div class="card" data-lv="lv_obj grid + lv_slider">
+    <div class="card-h"><h2>入眠サウンド</h2><span class="hint">タイマー 30分</span></div>
+    <div class="sound-grid">
+      <div class="snd"><div class="si" data-ic="wave"></div><div><b>ホワイトノイズ</b></div></div>
+      <div class="snd on"><div class="si" data-ic="rain"></div><div><b>雨</b><small>再生中</small></div><span class="eq"><i style="height:6px"></i><i style="height:12px"></i><i style="height:8px"></i></span></div>
+      <div class="snd"><div class="si" data-ic="wave"></div><div><b>ピンクノイズ</b></div></div>
+      <div class="snd"><div class="si" data-ic="sea"></div><div><b>波</b></div></div>
+      <div class="snd"><div class="si" data-ic="wave"></div><div><b>ブラウンノイズ</b></div></div>
+      <div class="snd"><div class="si" data-ic="music"></div><div><b>音楽</b></div></div>
+    </div>
+    <div class="ctrl"><div class="play" data-ic="pause"></div><i class="vol-ic" data-ic="vol"></i><div class="range"><i style="width:42%"></i><b style="left:42%"></b></div></div>
+    <div class="chips" style="margin-top:12px"><span class="chip">15分</span><span class="chip on">30分</span><span class="chip">60分</span><span class="chip">朝まで</span></div>
+  </div>
+  <div class="card"><div class="card-h"><h2>アラーム</h2><span class="hint">スヌーズ 5分・3回まで</span></div>
+    <div class="alarm-row"><div class="t">6:30<small>あす（日）</small></div><div class="sw on" data-lv="lv_switch"></div></div></div>
+  <button class="btn-primary"><i data-ic="moon"></i>計測をはじめる</button>
+</section></div></div><div class="cap2"><b>NT-01</b>おやすみ（サウンド・アラーム・計測開始）</div></div>
+
+<!-- NT-02 計測中 -->
+<div class="slot2"><div class="phone night" data-tab="none"><div class="screens"><section class="screen active">
+  <div class="nclock">1:24</div>
+  <div class="nsub">計測中・2時間43分</div>
+  <div style="height:70px"></div>
+  <div class="nrow"><span>雨・残り 0 分</span><b>停止しました</b></div>
+  <div class="nrow"><span>アラーム</span><b>6:30 に起こします</b></div>
+  <div class="nrow"><span>カーテン</span><b>閉めました（23:00 確認）</b></div>
+  <div class="longpress"><span class="ringp"></span>起きた（長押し）</div>
+  <p class="nsub" style="font-size:12px;margin-top:14px">画面は 30 秒で消えます。計測は続きます</p>
+</section></div></div><div class="cap2"><b>NT-02</b>計測中（暗い画面）</div></div>
+
+<!-- NT-03 アラーム鳴動 -->
+<div class="slot2"><div class="phone night" data-tab="none"><div class="screens"><section class="screen active" style="padding-bottom:0">
+  <div class="ring-alarm">6:30</div>
+  <div class="nsub" style="color:var(--ink-2)">11月1日（日）</div>
+  <div class="opres" style="margin:26px 4px 0;background:rgba(255,255,255,.05)"><span class="spin"></span><div class="grow">カーテンを開けています<small>自動モード・静音で開けています</small></div></div>
+  <div class="snooze">5分後にもう一度（あと 3 回）</div>
+  <div class="alarm-stop" data-lv="lv_button">止める<small>計測を終えて、記録を分析します</small></div>
+</section></div></div><div class="cap2"><b>NT-03</b>アラーム鳴動</div></div>
+
+<!-- BR-01 寝室 -->
+<div class="slot2"><div class="phone" data-tab="bedroom"><div class="screens"><section class="screen active">
+  <div class="screen-title"><h1>寝室</h1><span class="pill good">● 接続済み</span></div>
+  <div class="card" data-lv="nk_curtain_view + lv_slider">
+    <div class="card-h"><h2>寝室のカーテン</h2><span class="hint">6:21 に確認</span></div>
+    <div class="curtain-viz"><div class="rail"></div><div class="pnl l" style="width:9%"></div><div class="pnl r" style="width:9%"></div></div>
+    <div class="pos"><b>全開</b><span class="hint">開き具合 100%</span></div>
+    <div class="range" style="margin:14px 8px 4px"><i style="width:100%"></i><b style="left:100%"></b></div>
+    <div class="btn-pair" style="margin-top:14px"><div class="btn-ghost">閉める</div><div class="btn-primary" style="height:56px;font-size:15px">開ける</div></div>
+    <div class="opres ok" data-lv="nk_op_result"><i data-ic="checkc"></i><div class="grow">開けました（6:21 確認）<small>自動モード・アラームの 10 分前</small></div></div>
+  </div>
+  <div class="card" data-lv="automode card">
+    <div class="card-h"><h2>自動モード</h2><div class="sw on"></div></div>
+    <div class="banner" style="margin:0"><i class="bi" data-ic="clock"></i><div class="bt">次に自動で行うこと<small>あす（日）7:50 カーテンを開ける・8:00 アラーム</small></div></div>
+    <div class="btn-pair" style="margin-top:10px"><div class="btn-ghost" style="height:44px;font-size:13.5px">次の 1 回だけスキップ</div><div class="btn-ghost" style="height:44px;font-size:13.5px">自動モードを止める</div></div>
+  </div>
+  <div class="card dim"><div class="card-h"><h2>開閉の予約</h2><span class="hint">自動モードで管理しています</span></div>
+    <div class="sched"><span>開ける</span><span class="t">—</span></div></div>
+  <div class="card"><div class="card-h"><h2>動作の記録</h2></div><div class="log"><div><time>今朝 6:20</time>自動で開けました（確認済み）</div><div><time>昨夜 23:00</time>おやすみで閉めました（確認済み）</div><div><time>10/30 6:20</time>開ける命令は届きましたが、確認できませんでした</div></div></div>
+</section></div></div><div class="cap2"><b>BR-01</b>寝室（カーテン・自動モード）</div></div>
+
+<!-- BR-03 自動モード -->
+<div class="slot2"><div class="phone" data-tab="bedroom"><div class="screens"><section class="screen active">
+  <div class="screen-title"><h1>寝室</h1><span class="pill good">● 接続済み</span></div>
+  <div class="card"><div class="curtain-viz"><div class="rail"></div><div class="pnl l" style="width:50%"></div><div class="pnl r" style="width:50%"></div></div></div>
+  <div class="card"><div class="card-h"><h2>自動モード</h2><div class="sw"></div></div></div>
+</section></div>
+  <div class="sheet-bg"></div>
+  <div class="sheet" data-lv="lv_msgbox 相当（自作のシート）"><div class="grab"></div>
+    <h2>自動モードを有効にする</h2>
+    <p class="sub" style="font-size:13px;margin:0">オンにすると、次のことを自動で行います。</p>
+    <ol class="olist">
+      <li>毎朝のアラームをセットします（平日 6:30、休日 8:00）</li>
+      <li>アラームの 10 分前に、静かにカーテンを開けます</li>
+      <li>「おやすみ」で計測を始めると、カーテンを閉めます</li>
+      <li>アラームの前に「起きた」を押すと、その時点で開けます</li>
+    </ol>
+    <p class="q" style="margin:4px 0 8px">カーテンを開けるのは、アラームの</p>
+    <div class="chips"><span class="chip">5分前</span><span class="chip on">10分前</span><span class="chip">15分前</span><span class="chip">30分前</span></div>
+    <p class="disclaimer" style="padding:12px 0 4px">アドバイスの内容を、自動で設定に反映することはありません。いつでも手動で操作でき、寝室の画面や通知から止められます。</p>
+    <div class="btn-pair"><div class="btn-ghost">やめる</div><div class="btn-primary">有効にする</div></div>
+  </div>
+</div><div class="cap2"><b>BR-03</b>自動モードを有効にする（説明と確認）</div></div>
+
+<!-- BR-02 カーテンをつなぐ -->
+<div class="slot2"><div class="phone" data-tab="bedroom"><div class="screens"><section class="screen active">
+  <div class="subhead"><span class="icon-btn" data-ic="left"></span><h1>カーテンをつなぐ</h1></div>
+  <div class="card">
+    <p class="sub" style="margin:0 0 6px;font-size:13px">SwitchBot アプリで「トークン」と「シークレット」を取得し、コピーしてから貼り付けてください。</p>
+    <span class="link">取得のしかたを見る</span>
+    <p class="q" style="margin-top:14px">トークン</p>
+    <div class="field2" data-lv="lv_textarea + SDL_GetClipboardText"><span class="val">••••••••••••a1b2</span><span class="paste">貼り付け</span></div>
+    <p class="q">シークレット</p>
+    <div class="field2"><span class="val">••••••••••••9f0c</span><span class="paste">貼り付け</span></div>
+    <div class="opres ok"><i data-ic="checkc"></i><div class="grow">接続できました<small>カーテンが 2 台見つかりました</small></div></div>
+  </div>
+  <div class="card"><div class="card-h"><h2>使うカーテン</h2></div>
+    <div class="radio on"><span class="r"></span><div>寝室のカーテン<small>Curtain 3・ハブ経由</small></div></div>
+    <div class="radio"><span class="r"></span><div>リビング<small>Curtain 3・ハブ経由</small></div></div>
+  </div>
+  <button class="btn-primary">このカーテンを使う</button>
+  <div class="btn-ghost">試しに少し動かす</div>
+</section></div></div><div class="cap2"><b>BR-02</b>カーテンをつなぐ</div></div>
+
+<!-- ST-02 データとプライバシー -->
+<div class="slot2"><div class="phone" data-tab="home"><div class="screens"><section class="screen active">
+  <div class="subhead"><span class="icon-btn" data-ic="left"></span><h1>データとプライバシー</h1></div>
+  <div class="card">
+    <div class="setrow"><div>計測への同意<small>同意文 1.0 ・ 2026/10/20 に同意</small></div><span class="val">同意済み</span></div>
+    <div class="setrow"><div>マイク<small>いびきと寝室の音の大きさに使います</small></div><span class="val">許可済み</span></div>
+    <div class="setrow"><div>いびきの録音を残す<small>オンにすると、1 回 10 秒・1 晩 10 件まで暗号化して保存し、7 日で自動で消します。同室の人の声が入ることがあります</small></div><div class="sw"></div></div>
+  </div>
+  <div class="card">
+    <div class="setrow"><div>保存している記録<small>2026/10/18 から 14 夜分 ・ この端末の中だけ</small></div><span class="val">1.4 MB</span></div>
+    <div class="setrow"><div>細かな計測値の保存期間<small>毎日の結果は削除するまで残ります</small></div><span class="val">90 日</span></div>
+    <div class="setrow"><div>この分析について<small>何をどう推定しているか</small></div><span class="val">›</span></div>
+  </div>
+  <div class="btn-serious">記録をすべて削除する</div>
+  <div class="btn-ghost">同意を取り消す</div>
+  <p class="disclaimer">同意を取り消すと計測は止まり、記録を削除するかを選べます。</p>
+</section></div></div><div class="cap2"><b>ST-02</b>設定：データとプライバシー</div></div>
+
+<!-- X-01 状態表示の例 -->
+<div class="slot2"><div class="phone" data-tab="home"><div class="screens"><section class="screen active">
+  <div class="screen-title"><h1 style="font-size:20px">状態表示の例</h1><div class="date">UX-7</div></div>
+  <div class="catalog-h">保存中・分析中（ST-SAVING / ST-ANALYZING）</div>
+  <div class="banner"><span class="spin"></span><div class="bt">昨夜の記録を分析しています<small>前回の結果を表示しています</small></div></div>
+  <div class="catalog-h">計測が止まった（ST-TRACKING-INTERRUPTED）</div>
+  <div class="banner warn"><i class="bi" data-ic="info"></i><div class="bt">計測が止まっています（アプリが停止しました）<span class="link">計測を再開する</span></div></div>
+  <div class="catalog-h">許可がない（ST-PERM-EXACT-ALARM）</div>
+  <div class="banner serious"><i class="bi" data-ic="alarm"></i><div class="bt">正確な時刻に鳴らすための許可がオフです<small>アラームと自動モードが使えません</small><span class="link">設定を開く</span></div></div>
+  <div class="catalog-h">カーテンの操作結果（nk_op_result）</div>
+  <div class="opres"><span class="spin"></span><div class="grow">カーテンに伝えています</div></div>
+  <div class="opres unk"><i data-ic="info"></i><div class="grow">命令は届きましたが、動いたか確認できませんでした<small>状態を確かめる</small></div></div>
+  <div class="opres fail"><i data-ic="info"></i><div class="grow">開けられませんでした：カーテンが応答しません<small>ハブがオフラインの可能性があります ・ もう一度</small></div></div>
+  <div class="catalog-h">記録がまだない（ST-EMPTY-FIRST）</div>
+  <div class="card empty"><i data-ic="moonbig"></i><b>今夜から記録できます</b><span>寝る前に「おやすみ」を押してください</span></div>
+</section></div></div><div class="cap2"><b>X-01</b>状態表示の例（UX-7）</div></div>
+
+</main>
+
+<script>
+'use strict';
+/* ねむのき UIモック v2：静的な画面に、端末の枠・アイコン・グラフを差し込む */
+const S = (p, extra = '') => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" ${extra}>${p}</svg>`;
+const IC = {
+  phone: S('<rect x="7" y="3" width="10" height="18" rx="2.2"/><path d="M11 17.5h2"/>'),
+  spark: S('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" fill="currentColor" stroke="none"/>'),
+  mic: S('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>'),
+  lock: S('<rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>'),
+  trash: S('<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>'),
+  gear: S('<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/>'),
+  moon: S('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
+  moonbig: S('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>', 'stroke-width="1.4"'),
+  sun: S('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>'),
+  info: S('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.2"/>'),
+  left: S('<path d="m15 6-6 6 6 6"/>'), right: S('<path d="m9 6 6 6-6 6"/>'),
+  check: S('<path d="m5 12.5 4.5 4.5L19 7"/>', 'stroke-width="2.6"'),
+  checkc: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="m7.5 12.5 3 3 6-6.5" fill="none" stroke="#1A2147" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  wave: S('<path d="M3 12h2l2-5 3 10 3-12 3 9 2-2h3"/>'),
+  rain: S('<path d="M7 15a4.5 4.5 0 1 1 1-8.9A5.5 5.5 0 0 1 18.5 8a3.5 3.5 0 0 1-.5 7H7zM8 18l-1 2.5M12 18l-1 2.5M16 18l-1 2.5"/>'),
+  sea: S('<path d="M3 9c2 0 2-1.5 4.5-1.5S9.5 9 12 9s2.5-1.5 4.5-1.5S19 9 21 9M3 14c2 0 2-1.5 4.5-1.5S9.5 14 12 14s2.5-1.5 4.5-1.5S19 14 21 14M3 19c2 0 2-1.5 4.5-1.5S9.5 19 12 19s2.5-1.5 4.5-1.5S19 19 21 19"/>'),
+  music: S('<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>'),
+  pause: S('<path d="M9 6v12M15 6v12"/>', 'stroke-width="3"'),
+  vol: S('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>'),
+  clock: S('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  alarm: S('<circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.5M4 5.5 6.5 3M20 5.5 17.5 3"/>'),
+  home: S('<path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>'),
+  chart: S('<path d="M5 20v-7M12 20V5M19 20v-10"/>', 'stroke-width="2.4"'),
+  curtain: S('<path d="M3 4h18M5 4v16M19 4v16M5 4c0 6 2.5 11 6 16M19 4c0 6-2.5 11-6 16"/>'),
+};
+const TABS = [['home', 'ホーム', 'home'], ['history', '履歴', 'chart'], ['night', 'おやすみ', 'moon'], ['bedroom', '寝室', 'curtain']];
+
+function frame(ph) {
+  const sb = `<div class="notch"></div><div class="statusbar"><span>${ph.classList.contains('night') ? '1:24' : '7:02'}</span><span class="icons">●●● 64%</span></div>`;
+  ph.insertAdjacentHTML('afterbegin', sb);
+  const tab = ph.dataset.tab;
+  if (tab && tab !== 'none') {
+    ph.querySelector('.screens').insertAdjacentHTML('afterend', `<nav class="tabbar" data-lv="lv_layer_top のタブバー">${TABS.map(([id, l, ic]) =>
+      `<button class="tab ${id === tab ? 'active' : ''}">${IC[ic]}${l}</button>`).join('')}</nav>`);
+  }
+  ph.insertAdjacentHTML('beforeend', '<div class="home-indicator"></div>');
+}
+
+function ring(el) {
+  const v = +el.dataset.ring, tone = el.dataset.tone, r = 52, c = 2 * Math.PI * r;
+  const col = tone === 'ref' ? '#9298C2' : tone === 'good' ? '#5FD3A8' : tone === 'warn' ? '#F2C26B' : '#F09A6A';
+  const bg = tone === 'ref' ? `stroke="#9298C2" stroke-opacity=".45" stroke-dasharray="4 6"` : `stroke="${col}" stroke-opacity=".16"`;
+  el.innerHTML = `<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="${r}" fill="none" ${bg} stroke-width="9"/>` +
+    `<circle cx="60" cy="60" r="${r}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}"/></svg>` +
+    `<div class="val"><span class="num" style="${tone === 'ref' ? 'color:#B8BCD8' : ''}">${v}</span><span class="lbl">${tone === 'ref' ? '参考値' : '睡眠スコア'}</span></div>`;
+}
+
+// 眠りの帯：[分, 状態]  W 覚醒 / L 浅い / D 深い / S 眠り（分けない） / G 計測できず
+const HYP = {
+  ok: { start: 23 * 60 + 20, seg: [[28, 'W'], [20, 'L'], [40, 'D'], [40, 'L'], [6, 'W'], [30, 'L'], [22, 'D'], [60, 'L'], [40, 'L'], [16, 'W'], [70, 'L'], [10, 'D'], [66, 'L'], [4, 'W']] },
+  gap: { start: 23 * 60 + 50, seg: [[22, 'W'], [108, 'S'], [150, 'G'], [120, 'S'], [10, 'W']] },
+};
+HYP.detail = Object.assign({ events: { turn: [52, 95, 130, 171, 200, 236, 262, 300, 331, 360, 389, 410], snore: [140, 150, 300, 312], mark: [[0, 'サウンド'], [440, 'アラーム']] } }, HYP.ok);
+const COL = { W: '#F2C26B', L: '#9AA6F5', D: '#4E5BC8', S: '#8E99E8' };
+const LANE = { W: 6, L: 26, D: 46, S: 26 };
+const fmt = m => { m = ((m % 1440) + 1440) % 1440; return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; };
+function hyp(el) {
+  const d = HYP[el.dataset.hyp], total = d.seg.reduce((s, x) => s + x[0], 0), W = 326, x0 = 0;
+  const big = !!d.events, H = big ? 104 : 84, sx = m => x0 + (m / total) * W;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="眠りの帯"><defs><pattern id="hatch${el.dataset.hyp}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="6" fill="#F09A6A" fill-opacity=".75"/></pattern></defs>`;
+  s += [6, 26, 46].map(y => `<rect x="0" y="${y}" width="${W}" height="16" rx="3" fill="rgba(255,255,255,.035)"/>`).join('');
+  let t = 0;
+  for (const [m, st] of d.seg) {
+    if (st === 'G') s += `<rect x="${sx(t)}" y="4" width="${sx(t + m) - sx(t)}" height="60" fill="url(#hatch${el.dataset.hyp})" rx="3"/>`;
+    else s += `<rect x="${sx(t)}" y="${LANE[st]}" width="${Math.max(1.5, sx(t + m) - sx(t) - .6)}" height="16" rx="3" fill="${COL[st]}"/>`;
+    t += m;
+  }
+  if (big) {
+    d.events.turn.forEach(m => { s += `<path d="M${sx(m)} 69 l3.5 6 h-7z" fill="#B8BCD8"/>`; });
+    d.events.snore.forEach(m => { s += `<circle cx="${sx(m)}" cy="80" r="2.6" fill="#F2C26B"/>`; });
+    d.events.mark.forEach(([m]) => { s += `<path d="M${sx(m) + (m ? -4 : 4)} 72 l4 4 -4 4 -4 -4z" fill="#F08CA8"/>`; });
+  }
+  const ty = H - 4, ticks = [0, Math.round(total * .25), Math.round(total * .5), Math.round(total * .75), total];
+  ticks.forEach((m, i) => { s += `<text x="${sx(m)}" y="${ty}" font-size="10" fill="#9298C2" text-anchor="${i === 0 ? 'start' : i === 4 ? 'end' : 'middle'}">${fmt(d.start + m)}</text>`; });
+  el.innerHTML = s + '</svg>';
+}
+
+function cal(el) {
+  const st = {}; for (let d = 18; d <= 31; d++) st[d] = 'ok'; delete st[21]; st[24] = 'fail'; st[27] = 'ins';
+  let h = '日月火水木金土'.split('').map(x => `<div class="dw">${x}</div>`).join('');
+  h += [27, 28, 29, 30].map(d => `<div class="d out">${d}</div>`).join('');  // 9 月の末（10/1 は木曜）
+  for (let d = 1; d <= 31; d++) h += `<div class="d ${d === 31 ? 'sel' : ''}">${d}${st[d] ? `<i class="${st[d]}"></i>` : '<i></i>'}</div>`;
+  el.innerHTML = h;
+}
+
+function bars(el) {
+  const v = [452, 371, 300, 405, 386, 429, 398], q = ['ok', 'ok', 'ins', 'ok', 'ok', 'ok', 'ok'], lab = '日月火水木金土'.split(''), dt = [25, 26, 27, 28, 29, 30, 31];
+  const W = 326, H = 186, pl = 28, pr = 46, pt = 22, pb = 36, ph = H - pt - pb, yb = pt + ph, max = 600, sel = 6;
+  const y = m => yb - (m / max) * ph, band = (W - pl - pr) / 7, bw = 20;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="睡眠時間の棒グラフ">`;
+  [0, 180, 360, 540].forEach(m => { s += `<line x1="${pl}" x2="${W - pr}" y1="${y(m)}" y2="${y(m)}" stroke="rgba(255,255,255,.08)"/><text x="${pl - 6}" y="${y(m) + 3.5}" font-size="10" fill="#9298C2" text-anchor="end">${m / 60}h</text>`; });
+  s += `<line x1="${pl}" x2="${W - pr}" y1="${y(420)}" y2="${y(420)}" stroke="#B8BCD8" stroke-dasharray="4 3"/><text x="${W - pr + 6}" y="${y(420) - 1}" font-size="9.5" font-weight="700" fill="#B8BCD8">目標</text><text x="${W - pr + 6}" y="${y(420) + 10}" font-size="9.5" font-weight="700" fill="#B8BCD8">7h00m</text>`;
+  v.forEach((m, i) => {
+    const cx = pl + band * i + band / 2, x = cx - bw / 2, on = i === sel;
+    if (q[i] === 'ins') s += `<rect x="${x}" y="${y(m)}" width="${bw}" height="${yb - y(m)}" rx="4" fill="none" stroke="#9298C2" stroke-dasharray="3 3"/>`;
+    else s += `<rect x="${x}" y="${y(m)}" width="${bw}" height="${yb - y(m)}" rx="4" fill="#7788EE" fill-opacity="${on ? 1 : .5}"/>`;
+    if (on) s += `<text x="${cx}" y="${y(m) - 7}" font-size="11" font-weight="800" fill="#F2F3FA" text-anchor="middle">6h38m</text>`;
+    s += `<text x="${cx}" y="${yb + 15}" font-size="11" font-weight="${on ? 800 : 600}" fill="${on ? '#F2F3FA' : '#9298C2'}" text-anchor="middle">${lab[i]}</text><text x="${cx}" y="${yb + 28}" font-size="9.5" fill="#9298C2" text-anchor="middle">10/${dt[i]}</text>`;
+  });
+  el.innerHTML = s + '</svg><p class="hint" style="margin:6px 0 0">点線の棒は参考値（10/27）。平均と達成数は分析できた夜だけで計算</p>';
+}
+
+function fit() {
+  const p = new URLSearchParams(location.search);
+  const s = p.has('s') ? +p.get('s') : Math.min(0.72, Math.max(0.5, (window.innerWidth - 48) / 390));
+  document.documentElement.style.setProperty('--s', s);
+}
+
+document.querySelectorAll('.phone').forEach(frame);
+document.querySelectorAll('[data-ic]').forEach(el => { el.insertAdjacentHTML('afterbegin', IC[el.dataset.ic] || ''); });
+document.querySelectorAll('[data-ring]').forEach(ring);
+document.querySelectorAll('[data-hyp]').forEach(hyp);
+cal(document.getElementById('cal'));
+bars(document.getElementById('bars'));
+document.getElementById('lvtoggle').addEventListener('change', e => document.body.classList.toggle('show-lv', e.target.checked));
+window.addEventListener('resize', fit); fit();
+
+</script>
+</body>
+</html>
