@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android だけで使う固定の文言（通知チャネルの名前と、通知のボタン）。
+  通知のタイトルと本文は C の文字列表から渡すので、ここには置かない（ADR-0004）。
+  アプリ名（app_name）は build.gradle.kts の resValue で定義する（デバッグ版の名前を変えるため）。
+-->
+<resources>
+    <string name="nk_channel_tracking">計測中</string>
+    <string name="nk_channel_alarm">アラーム</string>
+    <string name="nk_channel_notice">カーテン・自動モード</string>
+    <string name="nk_channel_reminder">おやすみの通知</string>
+    <string name="nk_action_snooze">スヌーズ</string>
+    <string name="nk_action_stop_alarm">止める</string>
+    <string name="nk_action_stop_tracking">計測を止める</string>
+    <string name="nk_action_automode_skip">次の 1 回だけスキップ</string>
+    <string name="nk_action_automode_off">自動モードを止める</string>
+</resources>
