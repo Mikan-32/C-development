@@ -15,6 +15,8 @@
 
 `core.autocrlf` を `false` にするのは、改行コードの扱いをリポジトリの `.gitattributes` に任せるためです。
 
+この設定は、リポジトリを取得する（`git clone` や `scripts/add-submodules.ps1` を実行する）前に済ませてください。submodule（`third_party/`）には、このリポジトリの `.gitattributes` が効きません。Git for Windows の初期設定（`true`）のまま取得すると、submodule のファイルが CRLF で書き出され、あとで `false` にしたときに変更として表示されます（直し方は、下の「submodule の改行コードを直す」）。
+
 ## 2. Visual Studio Build Tools（C コンパイラ）
 
 1. [Visual Studio のダウンロードページ](https://visualstudio.microsoft.com/ja/downloads/)から「Build Tools for Visual Studio」を入れます。
@@ -105,4 +107,19 @@ UBSan や Valgrind を手元で使いたいときや、CI でだけ失敗する�
 |---|---|
 | `cmake --preset windows-clang` で clang-cl が見つからない | Developer PowerShell for VS で実行しているか。Build Tools に Clang のコンポーネントが入っているか |
 | 全行が差分として表示される | `git config --global core.autocrlf false` を実行したか。その後 `git add --renormalize .` |
+| `git status` で `third_party/…` に `(modified content)` と表示される | `core.autocrlf` を `false` にする前に submodule を取得していないか。下の「submodule の改行コードを直す」を参照（`git add --renormalize .` では直りません） |
 | `mise install` で clang-format が入らない | 上の「最初に試す人へ」を参照し、Issue に記録する |
+
+### submodule の改行コードを直す
+
+`core.autocrlf` を `false` にする前に取得した submodule は、ファイルが CRLF のまま残り、変更として表示されます（submodule の中で `git diff` を見ると、全行が差分になります）。次の手順で取り直します。
+
+1. 改行コード以外の変更がないことを確かめます。`Entering '…'` の行のほかに何も表示されなければ大丈夫です。
+   ```powershell
+   git submodule foreach --recursive "git diff --ignore-cr-at-eol --stat"
+   ```
+2. submodule のファイルを取り直します。submodule の中の変更は消えるので、1. で何か表示されたときは、先に退避してください。
+   ```powershell
+   git submodule foreach --recursive "git rm -rq --cached . && git reset -q --hard"
+   ```
+3. `git status` で `third_party/…` が表示されなければ完了です。
