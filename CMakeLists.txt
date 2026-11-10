@@ -1,7 +1,7 @@
 # ねむのき：C 部分のビルド設定（PC 版と Android 版で共通）
 # 使い方は README.md の「はじめかた」と、CMakePresets.json を参照
 cmake_minimum_required(VERSION 3.25)
-project(nemunoki VERSION 0.1.0 LANGUAGES C)
+project(nemunoki VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -50,13 +50,14 @@ endif()
 # 注意点は third_party/README.md を参照
 # ------------------------------------------------------------------
 # add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
-# add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
+add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
 
 # ------------------------------------------------------------------
 # コンポーネント（実装を始めたら追加する）
 # 各コンポーネントは静的ライブラリ nk_<名前> として定義し、nk_options をリンクする
 # ------------------------------------------------------------------
 # add_subdirectory(src/common)
+add_subdirectory(src/ui)
 
 # ------------------------------------------------------------------
 # テスト（PC 版のみ）

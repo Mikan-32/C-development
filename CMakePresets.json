@@ -1,21 +1,34 @@
 {
   "version": 6,
-  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "base",
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
     },
     {
       "name": "windows-clang",
       "displayName": "Windows（clang-cl・デバッグ）",
       "description": "日常の開発用。Developer PowerShell for VS から実行する",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_C_COMPILER": "clang-cl" },
-      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     },
     {
       "name": "linux-sanitize",
@@ -27,7 +40,11 @@
         "NK_ENABLE_SANITIZERS": "ON",
         "NK_WARNINGS_AS_ERRORS": "ON"
       },
-      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
     },
     {
       "name": "android-arm64",
@@ -44,22 +61,39 @@
     }
   ],
   "buildPresets": [
-    { "name": "windows-clang", "configurePreset": "windows-clang" },
-    { "name": "linux-sanitize", "configurePreset": "linux-sanitize" },
-    { "name": "android-arm64", "configurePreset": "android-arm64" }
+    {
+      "name": "windows-clang",
+      "configurePreset": "windows-clang"
+    },
+    {
+      "name": "linux-sanitize",
+      "configurePreset": "linux-sanitize"
+    },
+    {
+      "name": "android-arm64",
+      "configurePreset": "android-arm64"
+    }
   ],
   "testPresets": [
     {
       "name": "windows-clang",
       "configurePreset": "windows-clang",
-      "output": { "outputOnFailure": true },
-      "execution": { "noTestsAction": "ignore" }
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "ignore"
+      }
     },
     {
       "name": "linux-sanitize",
       "configurePreset": "linux-sanitize",
-      "output": { "outputOnFailure": true },
-      "execution": { "noTestsAction": "ignore" }
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "ignore"
+      }
     }
   ]
 }
