@@ -49,7 +49,7 @@ endif()
 # 外部ライブラリ（third_party に submodule を追加したら有効にする）
 # 注意点は third_party/README.md を参照
 # ------------------------------------------------------------------
-# add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
+add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
 
 # ------------------------------------------------------------------
@@ -58,11 +58,14 @@ add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
 # ------------------------------------------------------------------
 # add_subdirectory(src/common)
 add_subdirectory(src/ui)
+if(NOT ANDROID)
+    add_subdirectory(platform/pc)
+endif()
 
 # ------------------------------------------------------------------
 # テスト（PC 版のみ）
 # ------------------------------------------------------------------
 if(NK_BUILD_TESTS AND NOT ANDROID)
     enable_testing()
-    # add_subdirectory(tests)
+    add_subdirectory(tests)
 endif()

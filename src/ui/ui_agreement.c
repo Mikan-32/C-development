@@ -1,7 +1,3 @@
-///////////////////////////////////////
-/*動作検証のためのAIが書いてくれたコード*/
-///////////////////////////////////////
-
 #include "ui_agreement.h"
 
 #include "lvgl.h"
@@ -28,6 +24,7 @@ static void on_checkbox_changed(lv_event_t *e) {
 
 // 「次へ」ボタンが押されたときの処理
 static void on_next_clicked(lv_event_t *e) {
+    (void)e;
     // 1. 同意したことをデータ層（src/data）に保存する関数を呼ぶ
     // 2. 次の画面（ON-03 権限リクエスト）へ切り替える
 }
@@ -38,17 +35,18 @@ void ui_agreement_create(void) {
 
     // 2. タイトルラベル（文字）を作る
     lv_obj_t *title = lv_label_create(screen_obj);
-    lv_label_set_text(title, "利用規約とプライバシーポリシー");
+    lv_label_set_text(title, "Terms of Service"); // 文字化け対策で英語
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 40); // 画面上部中央から下に40px
 
     // 3. 説明文ラベルを作る
     lv_obj_t *desc = lv_label_create(screen_obj);
-    lv_label_set_text(desc, "ねむのきを利用するには、規約への同意が必要です。");
+    lv_label_set_text(
+        desc, "To use nemunoki,\n you must agree to the terms of service."); // 文字化け対策で英語
     lv_obj_align(desc, LV_ALIGN_TOP_MID, 0, 80);
 
     // 4. チェックボックスを作る
     agree_checkbox = lv_checkbox_create(screen_obj);
-    lv_checkbox_set_text(agree_checkbox, "利用規約に同意する");
+    lv_checkbox_set_text(agree_checkbox, "I agree to the terms of service"); // 文字化け対策で英語
     lv_obj_align(agree_checkbox, LV_ALIGN_CENTER, 0, 0);
     // タップイベントを検知するコールバック関数を登録
     lv_obj_add_event_cb(agree_checkbox, on_checkbox_changed, LV_EVENT_VALUE_CHANGED, NULL);
@@ -62,7 +60,7 @@ void ui_agreement_create(void) {
 
     // ボタンの中に文字ラベルを入れる
     lv_obj_t *btn_label = lv_label_create(next_btn);
-    lv_label_set_text(btn_label, "次へ進む");
+    lv_label_set_text(btn_label, "Next"); // 文字化け対策で英語
     lv_obj_center(btn_label);
 
     // 作った画面をアクティブにする（表示する）
@@ -74,4 +72,32 @@ void ui_agreement_destroy(void) {
         lv_obj_del(screen_obj); // LVGLが子オブジェクト（ボタンやラベル）もまとめて解放してくれる
         screen_obj = NULL;
     }
+}
+
+bool ui_agreement_is_checked(void) {
+    if (agree_checkbox == NULL) {
+        return false;
+    }
+    return lv_obj_has_state(agree_checkbox, LV_STATE_CHECKED);
+}
+
+bool ui_agreement_is_next_enabled(void) {
+    if (next_btn == NULL) {
+        return false;
+    }
+    // LV_STATE_DISABLED が付いていなければ「有効（押せる）」
+    return !lv_obj_has_state(next_btn, LV_STATE_DISABLED);
+}
+
+void ui_agreement_toggle_checkbox(void) {
+    if (agree_checkbox == NULL) {
+        return;
+    }
+    if (ui_agreement_is_checked()) {
+        lv_obj_clear_state(agree_checkbox, LV_STATE_CHECKED);
+    } else {
+        lv_obj_add_state(agree_checkbox, LV_STATE_CHECKED);
+    }
+    // 状態変更イベントを手動でトリガーしてコールバックを走らせる
+    lv_obj_send_event(agree_checkbox, LV_EVENT_VALUE_CHANGED, NULL);
 }
