@@ -1,0 +1,7 @@
+cmake --preset windows-clang
+cmake --build --preset windows-clang --target nemunoki_pc
+.\build\windows-clang\platform\pc\nemunoki_pc.exe
+
+
+cmake --build --preset windows-clang
+ctest --preset windows-clang --output-on-failure

@@ -2,17 +2,19 @@
 
 #include <stdbool.h>
 
-// 同意画面のUIを作成して表示する関数
-void ui_agreement_create(void);
+#define NK_CURRENT_AGREEMENT_VERSION 1
 
-// 画面を破棄（片付け）する関数
+// 同意画面のコールバック型（次へ進むときに呼ばれる）
+typedef void (*ui_agreement_on_next_cb)(void);
+
+// 画面の生成（次へ進むときのコールバック関数を渡す）
+void ui_agreement_create(ui_agreement_on_next_cb on_next);
+
+// 画面の破棄
 void ui_agreement_destroy(void);
 
-// 【追加】テスト・検証用：チェックボックスの状態を取得
+// テスト用
 bool ui_agreement_is_checked(void);
-
-// 【追加】テスト・検証用：次へ進むボタンが押せる状態（有効）か取得
 bool ui_agreement_is_next_enabled(void);
-
-// 【追加】テスト・検証用：外部からチェックボックスをトグル（切り替え）する
 void ui_agreement_toggle_checkbox(void);
+void ui_agreement_click_next(void);

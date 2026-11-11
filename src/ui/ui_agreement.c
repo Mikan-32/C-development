@@ -1,20 +1,17 @@
 #include "ui_agreement.h"
 
+#include "data/data_consent.h"
 #include "lvgl.h"
 
-// 画面全体の親オブジェクト
 static lv_obj_t *screen_obj = NULL;
-// 「次へ」ボタン
 static lv_obj_t *next_btn = NULL;
-// チェックボックス
 static lv_obj_t *agree_checkbox = NULL;
+static ui_agreement_on_next_cb s_on_next_cb = NULL;
 
-// チェックボックスがタップされたときの処理
 static void on_checkbox_changed(lv_event_t *e) {
     lv_obj_t *cb = lv_event_get_target(e);
     bool is_checked = lv_obj_has_state(cb, LV_STATE_CHECKED);
 
-    // チェックが入ったら「次へ」ボタンを押せるようにし、外れたら無効化（グレーアウト）する
     if (is_checked) {
         lv_obj_clear_state(next_btn, LV_STATE_DISABLED);
     } else {
@@ -22,75 +19,70 @@ static void on_checkbox_changed(lv_event_t *e) {
     }
 }
 
-// 「次へ」ボタンが押されたときの処理
 static void on_next_clicked(lv_event_t *e) {
     (void)e;
-    // 1. 同意したことをデータ層（src/data）に保存する関数を呼ぶ
-    // 2. 次の画面（ON-03 権限リクエスト）へ切り替える
+    // 1. 同意した規約バージョンを保存
+    data_consent_set_agreed(true, NK_CURRENT_AGREEMENT_VERSION);
+
+    // 2. 次の画面（ON-03）へ進むコールバックを実行
+    if (s_on_next_cb != NULL) {
+        s_on_next_cb();
+    }
 }
 
-void ui_agreement_create(void) {
-    // 1. 新しい画面のベースを作る
+void ui_agreement_create(ui_agreement_on_next_cb on_next) {
+    s_on_next_cb = on_next;
+
     screen_obj = lv_obj_create(NULL);
 
-    // 2. タイトルラベル（文字）を作る
+    // タイトル
     lv_obj_t *title = lv_label_create(screen_obj);
-    lv_label_set_text(title, "Terms of Service"); // 文字化け対策で英語
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 40); // 画面上部中央から下に40px
+    lv_label_set_text(title, "Terms of Service");
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 40);
 
-    // 3. 説明文ラベルを作る
+    // 説明文
     lv_obj_t *desc = lv_label_create(screen_obj);
-    lv_label_set_text(
-        desc, "To use nemunoki,\n you must agree to the terms of service."); // 文字化け対策で英語
+    lv_label_set_text(desc, "To use nemunoki,\nplease agree to the terms.");
     lv_obj_align(desc, LV_ALIGN_TOP_MID, 0, 80);
 
-    // 4. チェックボックスを作る
+    // チェックボックス
     agree_checkbox = lv_checkbox_create(screen_obj);
-    lv_checkbox_set_text(agree_checkbox, "I agree to the terms of service"); // 文字化け対策で英語
+    lv_checkbox_set_text(agree_checkbox, "I agree to the terms (v1.0)");
     lv_obj_align(agree_checkbox, LV_ALIGN_CENTER, 0, 0);
-    // タップイベントを検知するコールバック関数を登録
     lv_obj_add_event_cb(agree_checkbox, on_checkbox_changed, LV_EVENT_VALUE_CHANGED, NULL);
 
-    // 5. 「次へ」ボタンを作る
+    // 次へボタン
     next_btn = lv_btn_create(screen_obj);
     lv_obj_align(next_btn, LV_ALIGN_BOTTOM_MID, 0, -50);
-    // 最初はチェックされていないのでボタンを押せない状態にしておく
     lv_obj_add_state(next_btn, LV_STATE_DISABLED);
     lv_obj_add_event_cb(next_btn, on_next_clicked, LV_EVENT_CLICKED, NULL);
 
-    // ボタンの中に文字ラベルを入れる
     lv_obj_t *btn_label = lv_label_create(next_btn);
-    lv_label_set_text(btn_label, "Next"); // 文字化け対策で英語
+    lv_label_set_text(btn_label, "Next");
     lv_obj_center(btn_label);
 
-    // 作った画面をアクティブにする（表示する）
     lv_scr_load(screen_obj);
 }
 
 void ui_agreement_destroy(void) {
     if (screen_obj != NULL) {
-        lv_obj_del(screen_obj); // LVGLが子オブジェクト（ボタンやラベル）もまとめて解放してくれる
+        lv_obj_del(screen_obj);
         screen_obj = NULL;
+        next_btn = NULL;
+        agree_checkbox = NULL;
     }
 }
 
 bool ui_agreement_is_checked(void) {
-    if (agree_checkbox == NULL) {
-        return false;
-    }
-    return lv_obj_has_state(agree_checkbox, LV_STATE_CHECKED);
+    return agree_checkbox ? lv_obj_has_state(agree_checkbox, LV_STATE_CHECKED) : false;
 }
 
 bool ui_agreement_is_next_enabled(void) {
-    if (next_btn == NULL) {
-        return false;
-    }
-    // LV_STATE_DISABLED が付いていなければ「有効（押せる）」
-    return !lv_obj_has_state(next_btn, LV_STATE_DISABLED);
+    return next_btn ? !lv_obj_has_state(next_btn, LV_STATE_DISABLED) : false;
 }
 
 void ui_agreement_toggle_checkbox(void) {
-    if (agree_checkbox == NULL) {
+    if (!agree_checkbox) {
         return;
     }
     if (ui_agreement_is_checked()) {
@@ -98,6 +90,11 @@ void ui_agreement_toggle_checkbox(void) {
     } else {
         lv_obj_add_state(agree_checkbox, LV_STATE_CHECKED);
     }
-    // 状態変更イベントを手動でトリガーしてコールバックを走らせる
     lv_obj_send_event(agree_checkbox, LV_EVENT_VALUE_CHANGED, NULL);
+}
+
+void ui_agreement_click_next(void) {
+    if (ui_agreement_is_next_enabled()) {
+        on_next_clicked(NULL);
+    }
 }

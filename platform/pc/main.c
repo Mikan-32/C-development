@@ -7,6 +7,24 @@
 #define WINDOW_WIDTH  360
 #define WINDOW_HEIGHT 640
 
+#include "ui_agreement.h"
+#include "ui_permissions.h"
+#include "ui_privacy_settings.h"
+
+// 画面遷移用コールバック関数
+static void goto_privacy_settings(void);
+static void goto_permissions(void);
+
+static void goto_privacy_settings(void) {
+    ui_permissions_destroy();
+    ui_privacy_settings_create(NULL);
+}
+
+static void goto_permissions(void) {
+    ui_agreement_destroy();
+    ui_permissions_create(goto_privacy_settings);
+}
+
 static lv_display_t *disp = NULL;
 static lv_indev_t *mouse_indev = NULL;
 static SDL_Window *window = NULL;
@@ -74,7 +92,7 @@ int main(int argc, char *argv[]) {
     lv_indev_set_read_cb(mouse_indev, mouse_read_cb);
 
     // 同意画面のUIを作成して表示
-    ui_agreement_create();
+    ui_agreement_create(goto_permissions);
 
     uint64_t last_tick = SDL_GetTicks();
 

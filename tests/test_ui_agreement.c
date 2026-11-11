@@ -1,12 +1,20 @@
+#include "data/data_consent.h"
 #include "lvgl.h"
 #include "ui_agreement.h"
 #include "unity.h"
 
 static lv_display_t *disp = NULL;
+static bool s_next_called = false;
+
+static void dummy_on_next(void) {
+    s_next_called = true;
+}
 
 void setUp(void) {
     lv_init();
     disp = lv_display_create(320, 480);
+    s_next_called = false;
+    data_consent_reset();
 }
 
 void tearDown(void) {
@@ -17,27 +25,32 @@ void tearDown(void) {
     }
 }
 
-// 1. 画面がクラッシュせずに生成・破棄できるかのテスト
+// 画面生成・破棄テスト
 void test_ui_agreement_create_and_destroy(void) {
-    ui_agreement_create();
+    ui_agreement_create(dummy_on_next);
     lv_obj_t *act_scr = lv_screen_active();
     TEST_ASSERT_NOT_NULL(act_scr);
 }
 
-// 2. チェックボックスのオン／オフで「次へ」ボタンの有効状態が正しく切り替わるかのテスト
+// チェックボックストグルで次へボタンが有効化されるテスト
 void test_ui_agreement_checkbox_toggle_enables_next_button(void) {
-    ui_agreement_create();
+    ui_agreement_create(dummy_on_next);
 
-    // 初期状態：チェックは外れていて、ボタンは無効（押せない）であるべき
     TEST_ASSERT_FALSE(ui_agreement_is_checked());
     TEST_ASSERT_FALSE(ui_agreement_is_next_enabled());
 
-    // 1回トグル：チェックが入り、ボタンが有効化されるべき
+    // チェックを入れる
     ui_agreement_toggle_checkbox();
     TEST_ASSERT_TRUE(ui_agreement_is_checked());
     TEST_ASSERT_TRUE(ui_agreement_is_next_enabled());
 
-    // もう1回トグル：チェックが外れ、ボタンが再び無効化されるべき
+    // 次へをクリックしたらコールバックが呼ばれ、同意データが保存されること
+    ui_agreement_click_next();
+    TEST_ASSERT_TRUE(s_next_called);
+    TEST_ASSERT_TRUE(data_consent_is_agreed());
+    TEST_ASSERT_EQUAL_UINT32(NK_CURRENT_AGREEMENT_VERSION, data_consent_get_agreed_version());
+
+    // チェックを外す
     ui_agreement_toggle_checkbox();
     TEST_ASSERT_FALSE(ui_agreement_is_checked());
     TEST_ASSERT_FALSE(ui_agreement_is_next_enabled());

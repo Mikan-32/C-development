@@ -51,6 +51,7 @@ endif()
 # ------------------------------------------------------------------
 add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
+# add_subdirectory(third_party/sqlcipher EXCLUDE_FROM_ALL)
 
 # ------------------------------------------------------------------
 # コンポーネント（実装を始めたら追加する）
@@ -58,6 +59,7 @@ add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
 # ------------------------------------------------------------------
 # add_subdirectory(src/common)
 add_subdirectory(src/ui)
+add_subdirectory(src/data)
 if(NOT ANDROID)
     add_subdirectory(platform/pc)
 endif()
