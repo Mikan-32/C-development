@@ -33,7 +33,8 @@ git submodule update --init --recursive
 - **SQLCipher**：リポジトリのソースからは、そのままでは使えません。`sqlite3.c`（amalgamation）を生成する必要があり、生成には Tcl が要ります。「CI や WSL2 で生成して置いておく」などの方法を Issue で決めてください。
 - **OpenSSL**：Android と Windows 向けのビルドには Perl などが必要で、手間がかかります。「CI でビルドしてキャッシュを共有する」などの方法を Issue で決めてください。決まるまでは submodule に入れていません。
 - **curl**：使うのは HTTPS だけなので、CMake のオプションで使わないプロトコルを外して小さくします（`HTTP_ONLY` など）。
-- **LVGL**：設定ファイル `lv_conf.h` はリポジトリで管理します（置き場所は `src/ui/` を想定）。
+- **LVGL**：設定ファイルは `src/ui/lv_conf.h` です。同梱の CMake は C++・アセンブラ・ThorVG も有効にするため使わず、`src/` の C ファイルを直接ビルドします（ルートの `CMakeLists.txt`）。v9.6 では `LV_COLOR_DEPTH` などが非推奨になったため、`LV_COLOR_FORMAT_DEFAULT` を使います。LVGL 同梱の SDL ドライバーは SDL2 用なので、SDL3 との接続は `src/app/main.c` に自前で書いています。
+- **SDL3**：`add_subdirectory` で静的ライブラリとして組み込みます（PC 版で DLL を置かずに起動できるように）。X11 も Wayland も入っていない Linux（CI）では、自動でウィンドウなしの構成（`SDL_UNIX_CONSOLE_BUILD`）にします。Android 版への組み込みは、`android/` の Gradle プロジェクトを作るときに行います。
 
 ## 版を上げるとき
 

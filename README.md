@@ -4,7 +4,7 @@
 
 睡眠改善アプリ「ねむのき」の Android 版を開発します。アプリ本体は C 言語で書きます。
 
-> **ステータス**：開発環境を準備している段階です。アプリのコードはまだありません。
+> **ステータス**：画面の試作（PC 版）が動きます。表示している記録はデモ用の固定データで、計測・分析・カーテン操作などの機能はまだありません。
 
 ## ねむのきとは
 
@@ -77,6 +77,28 @@ C-development/
    cmake --build --preset windows-clang
    ctest --preset windows-clang
    ```
+
+## 画面の試作（PC 版）を動かす
+
+UI 案（`docs/ux/` の UX-6〜8 と画面モック v2、UX 班の改訂版 UX-1〜5）をもとに、全画面を LVGL で作っています。ビルドすると `build/windows-clang/nemunoki.exe` ができます。
+
+```powershell
+.\build\windows-clang\nemunoki.exe                                  # ホームから起動
+.\build\windows-clang\nemunoki.exe --screen BR-01                   # 画面を指定して起動
+.\build\windows-clang\nemunoki.exe --screen HM-01 --state ST-ANALYZING
+.\build\windows-clang\nemunoki.exe --list                           # 画面と状態の一覧
+.\build\windows-clang\nemunoki.exe --shots build\shots              # 全画面・全状態を PNG で保存（ウィンドウなし）
+```
+
+| 操作 | 内容 |
+|---|---|
+| クリック・ドラッグ・ホイール | タップ・スクロール |
+| Esc・Backspace | 戻る（Android の戻るボタン） |
+| F2 | いまの画面を PNG で保存 |
+| F12 | 画面と状態の一覧（押すとその画面を開く） |
+
+- 日本語フォントは、`assets/fonts/NotoSansJP-*.ttf`（同梱する予定）か、Windows の游ゴシック・メイリオを使います。`--font` と `--font-bold` で指定もできます。
+- `--font-scale 1.2`（大）・`1.4`（特大）で文字を大きくし、`--reduce-motion` で動きを減らします（UX-8）。
 
 ## 開発の流れ
 

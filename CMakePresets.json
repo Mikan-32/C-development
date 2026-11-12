@@ -14,7 +14,7 @@
       "displayName": "Windows（clang-cl・デバッグ）",
       "description": "日常の開発用。Developer PowerShell for VS から実行する",
       "inherits": "base",
-      "cacheVariables": { "CMAKE_C_COMPILER": "clang-cl" },
+      "cacheVariables": { "CMAKE_C_COMPILER": "clang-cl", "CMAKE_CXX_COMPILER": "clang-cl" },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
     },
     {
@@ -53,13 +53,13 @@
       "name": "windows-clang",
       "configurePreset": "windows-clang",
       "output": { "outputOnFailure": true },
-      "execution": { "noTestsAction": "ignore" }
+      "execution": { "noTestsAction": "error" }
     },
     {
       "name": "linux-sanitize",
       "configurePreset": "linux-sanitize",
       "output": { "outputOnFailure": true },
-      "execution": { "noTestsAction": "ignore" }
+      "execution": { "noTestsAction": "error" }
     }
   ]
 }
