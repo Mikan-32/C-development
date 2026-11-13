@@ -1,9 +1,10 @@
-#include "data/data_consent.h"
+#include "data_consent.h"
 #include "lvgl.h"
 #include "ui_agreement.h"
+#include "ui_permissions.h"
 #include "unity.h"
 
-static lv_display_t *disp = NULL;
+static lv_display_t *s_disp = NULL;
 static bool s_next_called = false;
 
 static void dummy_on_next(void) {
@@ -12,53 +13,57 @@ static void dummy_on_next(void) {
 
 void setUp(void) {
     lv_init();
-    disp = lv_display_create(320, 480);
+    s_disp = lv_display_create(360, 640);
     s_next_called = false;
-    data_consent_reset();
+    nk_data_consent_reset();
 }
 
 void tearDown(void) {
-    ui_agreement_destroy();
-    if (disp != NULL) {
-        lv_display_delete(disp);
-        disp = NULL;
+    nk_ui_agreement_destroy();
+    nk_ui_permissions_destroy();
+    if (s_disp != NULL) {
+        lv_display_delete(s_disp);
+        s_disp = NULL;
     }
 }
 
-// 画面生成・破棄テスト
-void test_ui_agreement_create_and_destroy(void) {
-    ui_agreement_create(dummy_on_next);
-    lv_obj_t *act_scr = lv_screen_active();
-    TEST_ASSERT_NOT_NULL(act_scr);
+void test_nk_ui_agreement_flow(void) {
+    nk_ui_agreement_create(dummy_on_next, false);
+
+    TEST_ASSERT_FALSE(nk_ui_agreement_is_checked());
+    TEST_ASSERT_FALSE(nk_ui_agreement_is_next_enabled());
+
+    nk_ui_agreement_toggle_checkbox();
+    TEST_ASSERT_TRUE(nk_ui_agreement_is_checked());
+    TEST_ASSERT_TRUE(nk_ui_agreement_is_next_enabled());
+
+    nk_ui_agreement_click_next();
+    TEST_ASSERT_TRUE(s_next_called);
+    TEST_ASSERT_TRUE(nk_data_consent_is_agreed());
+    TEST_ASSERT_EQUAL_UINT32(NK_DATA_CONSENT_CURRENT_VERSION, nk_data_consent_get_agreed_version());
 }
 
-// チェックボックストグルで次へボタンが有効化されるテスト
-void test_ui_agreement_checkbox_toggle_enables_next_button(void) {
-    ui_agreement_create(dummy_on_next);
+void test_nk_ui_permissions_mic_denied_shows_warning(void) {
+    nk_ui_permissions_create(NULL, NULL);
 
-    TEST_ASSERT_FALSE(ui_agreement_is_checked());
-    TEST_ASSERT_FALSE(ui_agreement_is_next_enabled());
+    // 初期状態：エラー表示は隠れており、完了ボタンは無効
+    TEST_ASSERT_FALSE(nk_ui_permissions_is_mic_denied_shown());
+    TEST_ASSERT_FALSE(nk_ui_permissions_is_done_enabled());
 
-    // チェックを入れる
-    ui_agreement_toggle_checkbox();
-    TEST_ASSERT_TRUE(ui_agreement_is_checked());
-    TEST_ASSERT_TRUE(ui_agreement_is_next_enabled());
+    // マイク権限が拒否された場合：ST-PERM-MIC 警告が表示され、完了ボタンは無効のまま
+    nk_ui_permissions_set_mic_status(NK_PERM_STATUS_DENIED);
+    TEST_ASSERT_TRUE(nk_ui_permissions_is_mic_denied_shown());
+    TEST_ASSERT_FALSE(nk_ui_permissions_is_done_enabled());
 
-    // 次へをクリックしたらコールバックが呼ばれ、同意データが保存されること
-    ui_agreement_click_next();
-    TEST_ASSERT_TRUE(s_next_called);
-    TEST_ASSERT_TRUE(data_consent_is_agreed());
-    TEST_ASSERT_EQUAL_UINT32(NK_CURRENT_AGREEMENT_VERSION, data_consent_get_agreed_version());
-
-    // チェックを外す
-    ui_agreement_toggle_checkbox();
-    TEST_ASSERT_FALSE(ui_agreement_is_checked());
-    TEST_ASSERT_FALSE(ui_agreement_is_next_enabled());
+    // 再試行でマイク権限が許可された場合：警告が消え、完了ボタンが有効になる
+    nk_ui_permissions_set_mic_status(NK_PERM_STATUS_GRANTED);
+    TEST_ASSERT_FALSE(nk_ui_permissions_is_mic_denied_shown());
+    TEST_ASSERT_TRUE(nk_ui_permissions_is_done_enabled());
 }
 
 int main(void) {
     UNITY_BEGIN();
-    RUN_TEST(test_ui_agreement_create_and_destroy);
-    RUN_TEST(test_ui_agreement_checkbox_toggle_enables_next_button);
+    RUN_TEST(test_nk_ui_agreement_flow);
+    RUN_TEST(test_nk_ui_permissions_mic_denied_shows_warning);
     return UNITY_END();
 }

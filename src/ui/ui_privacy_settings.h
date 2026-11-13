@@ -1,14 +1,7 @@
 #pragma once
 
-#include <stdbool.h>
+typedef void (*nk_ui_privacy_on_revoke_cb)(void);
 
-typedef void (*ui_privacy_on_revoke_cb)(void);
-
-// 画面の生成
-void ui_privacy_settings_create(ui_privacy_on_revoke_cb on_revoke);
-
-// 画面の破棄
-void ui_privacy_settings_destroy(void);
-
-// テスト用
-void ui_privacy_settings_click_revoke(void);
+void nk_ui_privacy_create(nk_ui_privacy_on_revoke_cb on_revoke);
+void nk_ui_privacy_destroy(void);
+void nk_ui_privacy_click_revoke(void);

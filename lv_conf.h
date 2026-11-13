@@ -56,7 +56,7 @@
 
 #if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN
 /** Size of the pool `lv_malloc()` allocates from. Needs to be at least 2kB (2048). */
-#define LV_MEM_SIZE 65536
+#define LV_MEM_SIZE (2048 * 1024U)
 
 /** Place the pool at a fixed address instead of allocating it as a normal array.
  *  0: unused.
@@ -1196,11 +1196,11 @@
 #endif /*LV_USE_FREETYPE*/
 
 /** Built-in TTF decoder */
-#define LV_USE_TINY_TTF 0
+#define LV_USE_TINY_TTF 1
 
 #if LV_USE_TINY_TTF
 /** Load TTF data from files */
-#define LV_TINY_TTF_FILE_SUPPORT 0
+#define LV_TINY_TTF_FILE_SUPPORT 1
 
 /** Glyph cache size (glyphs) */
 #define LV_TINY_TTF_CACHE_GLYPH_CNT 128

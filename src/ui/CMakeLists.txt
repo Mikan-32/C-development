@@ -5,6 +5,8 @@ add_library(nk_ui STATIC
     ui_permissions.h
     ui_privacy_settings.c
     ui_privacy_settings.h
+    ui_font.c
+    ui_font.h
 )
 
 target_include_directories(nk_ui PUBLIC

@@ -2,18 +2,27 @@
 
 #include <stdbool.h>
 
-typedef void (*ui_permissions_on_done_cb)(void);
+typedef enum {
+    NK_PERM_STATUS_UNKNOWN = 0,
+    NK_PERM_STATUS_GRANTED,
+    NK_PERM_STATUS_DENIED
+} nk_perm_status_t;
 
-// 画面の生成
-void ui_permissions_create(ui_permissions_on_done_cb on_done);
+typedef void (*nk_ui_permissions_on_done_cb)(void);
+typedef void (*nk_ui_permissions_request_handler_cb)(void);
 
-// 画面の破棄
-void ui_permissions_destroy(void);
+void nk_ui_permissions_create(nk_ui_permissions_on_done_cb on_done,
+                              nk_ui_permissions_request_handler_cb on_request);
+void nk_ui_permissions_destroy(void);
 
-// 外部（SDL3 / プラットフォーム）から権限結果を反映する関数
-void ui_permissions_set_mic_granted(bool granted);
-void ui_permissions_set_notification_granted(bool granted);
+// プラットフォーム（SDL3 / Android）からの権限結果をUIへ反映
+void nk_ui_permissions_set_mic_status(nk_perm_status_t status);
+void nk_ui_permissions_set_notification_status(nk_perm_status_t status);
 
-// テスト用
-bool ui_permissions_is_done_enabled(void);
-void ui_permissions_click_request(void);
+// 状態確認・テスト操作用 API
+nk_perm_status_t nk_ui_permissions_get_mic_status(void);
+nk_perm_status_t nk_ui_permissions_get_notification_status(void);
+bool nk_ui_permissions_is_done_enabled(void);
+bool nk_ui_permissions_is_mic_denied_shown(void);
+void nk_ui_permissions_click_request(void);
+void nk_ui_permissions_click_done(void);

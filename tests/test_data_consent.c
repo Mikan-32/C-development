@@ -1,43 +1,51 @@
 #include "data_consent.h"
+#include "nk_db.h"
 #include "unity.h"
 
+#include <string.h>
+
 void setUp(void) {
-    data_consent_reset();
+    const char *key = "test_key";
+    nk_db_open(":memory:", key, (int)strlen(key));
+    nk_data_consent_reset();
 }
 
 void tearDown(void) {
-    data_consent_reset();
+    nk_db_close();
 }
 
-// 初期状態は未同意（false）かつバージョン0であるべき
-void test_data_consent_initial_state_is_false(void) {
-    TEST_ASSERT_FALSE(data_consent_is_agreed());
-    TEST_ASSERT_EQUAL_UINT32(0, data_consent_get_agreed_version());
+void test_nk_data_consent_initial_requires_agreement(void) {
+    TEST_ASSERT_FALSE(nk_data_consent_is_agreed());
+    TEST_ASSERT_EQUAL_UINT32(0, nk_data_consent_get_agreed_version());
+    TEST_ASSERT_TRUE(nk_data_consent_needs_reagreement(1));
 }
 
-// 同意状態とバージョンを設定したら正しく取得できるべき
-void test_data_consent_set_agreed_true(void) {
-    bool result = data_consent_set_agreed(true, 1);
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_TRUE(data_consent_is_agreed());
-    TEST_ASSERT_EQUAL_UINT32(1, data_consent_get_agreed_version());
+void test_nk_data_consent_persist_and_version_check(void) {
+    TEST_ASSERT_TRUE(nk_data_consent_set_agreed(true, 1));
+    TEST_ASSERT_TRUE(nk_data_consent_is_agreed());
+    TEST_ASSERT_EQUAL_UINT32(1, nk_data_consent_get_agreed_version());
+
+    // メモリをリセットしてDBから再ロードしても維持されているか検証
+    nk_data_consent_init();
+    TEST_ASSERT_TRUE(nk_data_consent_is_agreed());
+    TEST_ASSERT_EQUAL_UINT32(1, nk_data_consent_get_agreed_version());
+
+    // 同じ版(v1)なら再同意不要、新しい版(v2)になったら再同意が必要
+    TEST_ASSERT_FALSE(nk_data_consent_needs_reagreement(1));
+    TEST_ASSERT_TRUE(nk_data_consent_needs_reagreement(2));
 }
 
-// 同意を撤回したら false かつバージョン0になるべき
-void test_data_consent_set_agreed_false(void) {
-    data_consent_set_agreed(true, 1);
-    TEST_ASSERT_TRUE(data_consent_is_agreed());
-
-    bool result = data_consent_set_agreed(false, 0);
-    TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_FALSE(data_consent_is_agreed());
-    TEST_ASSERT_EQUAL_UINT32(0, data_consent_get_agreed_version());
+void test_nk_data_consent_revoke_clears_state(void) {
+    nk_data_consent_set_agreed(true, 1);
+    TEST_ASSERT_TRUE(nk_data_consent_set_agreed(false, 0));
+    TEST_ASSERT_FALSE(nk_data_consent_is_agreed());
+    TEST_ASSERT_TRUE(nk_data_consent_needs_reagreement(1));
 }
 
 int main(void) {
     UNITY_BEGIN();
-    RUN_TEST(test_data_consent_initial_state_is_false);
-    RUN_TEST(test_data_consent_set_agreed_true);
-    RUN_TEST(test_data_consent_set_agreed_false);
+    RUN_TEST(test_nk_data_consent_initial_requires_agreement);
+    RUN_TEST(test_nk_data_consent_persist_and_version_check);
+    RUN_TEST(test_nk_data_consent_revoke_clears_state);
     return UNITY_END();
 }
