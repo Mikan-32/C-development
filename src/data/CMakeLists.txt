@@ -1,6 +1,8 @@
 add_library(nk_data STATIC
     data_consent.c
     data_consent.h
+    data_session.c
+    data_session.h
     nk_db.c
     nk_db.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/sqlite3/sqlite3.c
