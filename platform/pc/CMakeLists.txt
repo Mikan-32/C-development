@@ -1,12 +1,15 @@
 add_library(nk_replay STATIC
     replay.c
+    wav_reader.c
 )
 
-target_include_directories(nk_replay PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}"
+target_include_directories(nk_replay
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 
-target_link_libraries(nk_replay PUBLIC
-    nk_options
-    nk_sensing
+target_link_libraries(nk_replay
+    PUBLIC
+        nk_options
+        nk_sensing
 )

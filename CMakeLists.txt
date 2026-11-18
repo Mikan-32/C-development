@@ -145,4 +145,24 @@ if(NK_BUILD_TESTS AND NOT ANDROID)
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     )
 
+    add_executable(nk_wav_reader_check
+        tests/unit/wav_reader_check.c
+    )
+
+    target_link_libraries(nk_wav_reader_check
+        PRIVATE
+            nk_replay
+            nk_unity
+            nk_options
+    )
+
+    add_test(
+        NAME wav_reader
+        COMMAND nk_wav_reader_check
+    )
+
+    set_tests_properties(wav_reader PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    )
+
 endif()
