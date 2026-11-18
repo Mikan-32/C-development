@@ -36,3 +36,6 @@ captures/
 *.pem
 .env
 secrets.*
+
+# Generated dependency files
+/third_party/prebuilt/
