@@ -54,12 +54,21 @@ endif()
 
 add_subdirectory(src/common)
 add_subdirectory(src/data)
+add_subdirectory(src/session)
 
 # ------------------------------------------------------------------
 # テスト（PC 版のみ）
 # ------------------------------------------------------------------
 if(NK_BUILD_TESTS AND NOT ANDROID)
     enable_testing()
+
+    add_library(nk_unity STATIC
+        third_party/Unity/src/unity.c
+    )
+
+    target_include_directories(nk_unity PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/Unity/src"
+    )
 
     add_executable(nk_sqlcipher_check
         tests/unit/sqlcipher_check.c
@@ -85,5 +94,32 @@ if(NK_BUILD_TESTS AND NOT ANDROID)
     add_test(
         NAME data_encryption
         COMMAND nk_data_check
+    )
+
+    add_executable(nk_session_check
+        tests/unit/session_check.c
+    )
+
+    target_link_libraries(nk_session_check PRIVATE
+        nk_session
+    )
+
+    add_test(
+        NAME session_consent
+        COMMAND nk_session_check
+    )
+
+    add_executable(nk_session_unity_check
+        tests/unit/session_unity_check.c
+    )
+
+    target_link_libraries(nk_session_unity_check PRIVATE
+        nk_session
+        nk_unity
+    )
+
+    add_test(
+        NAME session_unity
+        COMMAND nk_session_unity_check
     )
 endif()
