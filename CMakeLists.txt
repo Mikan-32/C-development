@@ -54,6 +54,7 @@ endif()
 
 add_subdirectory(src/common)
 add_subdirectory(src/data)
+add_subdirectory(src/sensing)
 add_subdirectory(src/session)
 
 # ------------------------------------------------------------------
@@ -61,6 +62,8 @@ add_subdirectory(src/session)
 # ------------------------------------------------------------------
 if(NK_BUILD_TESTS AND NOT ANDROID)
     enable_testing()
+
+    add_subdirectory(platform/pc)
 
     add_library(nk_unity STATIC
         third_party/Unity/src/unity.c
@@ -122,4 +125,24 @@ if(NK_BUILD_TESTS AND NOT ANDROID)
         NAME session_unity
         COMMAND nk_session_unity_check
     )
+
+    add_executable(test_sensing_replay
+        tests/test_sensing_replay.c
+    )
+
+    target_link_libraries(test_sensing_replay PRIVATE
+        nk_replay
+        nk_unity
+        nk_options
+    )
+
+    add_test(
+        NAME sensing_replay
+        COMMAND test_sensing_replay
+    )
+
+    set_tests_properties(sensing_replay PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+
 endif()
