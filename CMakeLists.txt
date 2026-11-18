@@ -52,16 +52,38 @@ endif()
 # add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
 # add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
 
-# ------------------------------------------------------------------
-# コンポーネント（実装を始めたら追加する）
-# 各コンポーネントは静的ライブラリ nk_<名前> として定義し、nk_options をリンクする
-# ------------------------------------------------------------------
-# add_subdirectory(src/common)
+add_subdirectory(src/common)
+add_subdirectory(src/data)
 
 # ------------------------------------------------------------------
 # テスト（PC 版のみ）
 # ------------------------------------------------------------------
 if(NK_BUILD_TESTS AND NOT ANDROID)
     enable_testing()
-    # add_subdirectory(tests)
+
+    add_executable(nk_sqlcipher_check
+        tests/unit/sqlcipher_check.c
+    )
+
+    target_link_libraries(nk_sqlcipher_check PRIVATE
+        nk_data
+    )
+
+    add_test(
+        NAME sqlcipher_check
+        COMMAND nk_sqlcipher_check
+    )
+
+    add_executable(nk_data_check
+        tests/unit/data_check.c
+    )
+
+    target_link_libraries(nk_data_check PRIVATE
+        nk_data
+    )
+
+    add_test(
+        NAME data_encryption
+        COMMAND nk_data_check
+    )
 endif()
