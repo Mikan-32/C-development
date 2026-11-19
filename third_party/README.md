@@ -24,8 +24,12 @@ git commit -m "build(third_party): 外部ライブラリを submodule として�
 ほかのメンバーは、取得後に次を実行するだけです。
 
 ```powershell
-git submodule update --init --recursive
+git submodule update --init --recursive --depth 1
 ```
+
+`--depth 1` を付けないと、ライブラリの全履歴を取りに行くため、とても時間がかかります（lvgl だけで 15 分以上）。
+
+`git submodule update --remote` は使わないでください。ライブラリが決めたタグから最新版に変わり、それをコミットすると版がずれます。コミットする前に、`git status` で `third_party/` が変更に入っていないか確認してください。
 
 ## 組み込むときの注意
 
