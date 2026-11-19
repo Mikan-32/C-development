@@ -21,13 +21,16 @@ add_library(nk_options INTERFACE)
 if(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # clang-cl（Windows）
     target_compile_options(nk_options INTERFACE /W4)
+
     if(NK_WARNINGS_AS_ERRORS)
         target_compile_options(nk_options INTERFACE /WX)
     endif()
 else()
     # clang（Linux・Android）
     target_compile_options(nk_options INTERFACE
-        -Wall -Wextra -Wpedantic -Wshadow -Wstrict-prototypes -Wmissing-prototypes)
+        -Wall -Wextra -Wpedantic -Wshadow -Wstrict-prototypes -Wmissing-prototypes
+    )
+
     if(NK_WARNINGS_AS_ERRORS)
         target_compile_options(nk_options INTERFACE -Werror)
     endif()
@@ -35,18 +38,25 @@ endif()
 
 if(NK_ENABLE_SANITIZERS)
     target_compile_options(nk_options INTERFACE
-        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
-    target_link_options(nk_options INTERFACE -fsanitize=address,undefined)
+        -fsanitize=address,undefined
+        -fno-sanitize-recover=undefined
+        -fno-omit-frame-pointer
+    )
+
+    target_link_options(nk_options INTERFACE
+        -fsanitize=address,undefined
+    )
 endif()
 
 if(ANDROID)
-    # Google Play の 16KB ページサイズ要件への対応。
-    # NDK r28 以降は既定でこの設定になるが、古い NDK で誤ってビルドしたときの保険として明示する
-    target_link_options(nk_options INTERFACE "LINKER:-z,max-page-size=16384")
+    # Google Play の 16KB ページサイズ要件への対応
+    target_link_options(nk_options INTERFACE
+        "LINKER:-z,max-page-size=16384"
+    )
 endif()
 
 # ------------------------------------------------------------------
-# 外部ライブラリ（third_party に submodule を追加したら有効にする）
+# 外部ライブラリ
 # 注意点は third_party/README.md を参照
 # ------------------------------------------------------------------
 # add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
@@ -72,6 +82,12 @@ if(NK_BUILD_TESTS AND NOT ANDROID)
     target_include_directories(nk_unity PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/third_party/Unity/src"
     )
+
+    if(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        target_compile_definitions(nk_unity PUBLIC
+            UNITY_NORETURN=_Noreturn
+        )
+    endif()
 
     add_executable(nk_sqlcipher_check
         tests/unit/sqlcipher_check.c
@@ -149,11 +165,10 @@ if(NK_BUILD_TESTS AND NOT ANDROID)
         tests/unit/wav_reader_check.c
     )
 
-    target_link_libraries(nk_wav_reader_check
-        PRIVATE
-            nk_replay
-            nk_unity
-            nk_options
+    target_link_libraries(nk_wav_reader_check PRIVATE
+        nk_replay
+        nk_unity
+        nk_options
     )
 
     add_test(
@@ -165,4 +180,30 @@ if(NK_BUILD_TESTS AND NOT ANDROID)
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     )
 
-endif()
+    option(NK_ENABLE_LOCAL_WAV_TESTS
+        "Enable replay tests using a local recording"
+        OFF
+    )
+
+    if(NK_ENABLE_LOCAL_WAV_TESTS)
+        add_executable(test_wav_sensing_replay
+            tests/test_wav_sensing_replay.c
+        )
+
+        target_link_libraries(test_wav_sensing_replay PRIVATE
+            nk_replay
+            nk_unity
+            nk_options
+        )
+
+        add_test(
+            NAME wav_sensing_replay
+            COMMAND test_wav_sensing_replay
+        )
+
+        set_tests_properties(wav_sensing_replay PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+    endif() # NK_ENABLE_LOCAL_WAV_TESTS
+
+endif() # NK_BUILD_TESTS AND NOT ANDROID
