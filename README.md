@@ -77,6 +77,10 @@ C-development/
    cmake --build --preset windows-clang
    ctest --preset windows-clang
    ```
+5. 画面の試作を起動します。値はすべて固定で、データや機器にはまだつながっていません。クリックで押す、ホイールでスクロール、Esc で戻る、の操作ができます。
+   ```powershell
+   .\build\windows-clang\nemunoki.exe
+   ```
 
 ## 開発の流れ
 

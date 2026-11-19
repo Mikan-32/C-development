@@ -17,5 +17,5 @@ CI では、Linux 上で AddressSanitizer と UndefinedBehaviorSanitizer を有�
 ## テストを追加するとき
 
 1. `unit/<コンポーネント名>/` にテストのファイルを作ります。
-2. `tests/CMakeLists.txt`（最初のテストを書く人が作ります）に、テストの実行ファイルと `add_test` を追加します。
-3. 最初のテストが入ったら、`CMakePresets.json` のテストプリセットの `noTestsAction` を `ignore` から `error` に変えます（テストが 1 つも見つからないときに失敗させるため）。
+2. `tests/CMakeLists.txt` に、テストの実行ファイルと `add_test` を追加します（例：`unit/ui/test_ui_screens.c`）。
+3. `CMakePresets.json` のテストプリセットは `noTestsAction: error` にしてあります（テストが 1 つも見つからないときに失敗させるため）。
