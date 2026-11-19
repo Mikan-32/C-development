@@ -22,6 +22,8 @@ if(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # clang-cl（Windows）
     # /utf-8：画面の日本語（UTF-8 のソース）を文字化けさせないため。clang-cl では既定と同じ
     target_compile_options(nk_options INTERFACE /W4 /utf-8)
+    # fopen などの標準 C の関数に「fopen_s を使え」と出る警告を止める（fopen_s は Linux・Android にない）
+    target_compile_definitions(nk_options INTERFACE _CRT_SECURE_NO_WARNINGS)
     if(NK_WARNINGS_AS_ERRORS)
         target_compile_options(nk_options INTERFACE /WX)
     endif()
@@ -106,9 +108,13 @@ endif()
 # 各コンポーネントは静的ライブラリ nk_<名前> として定義し、nk_options をリンクする
 # ------------------------------------------------------------------
 # add_subdirectory(src/common)
+# data：データベース（SQLite）と同意・睡眠記録。画面を使わないので Android 版でもビルドする
+add_subdirectory(src/data)
 if(NOT ANDROID)
     add_subdirectory(src/ui)
     add_subdirectory(src/app)
+    # 初回起動の同意と権限の画面（UX-1・Issue #28）を、単独で動かして確かめる PC 版
+    add_subdirectory(platform/pc)
 endif()
 
 # ------------------------------------------------------------------
