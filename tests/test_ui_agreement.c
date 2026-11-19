@@ -27,7 +27,7 @@ void tearDown(void) {
     }
 }
 
-void test_nk_ui_agreement_flow(void) {
+static void test_nk_ui_agreement_flow(void) {
     nk_ui_agreement_create(dummy_on_next, false);
 
     TEST_ASSERT_FALSE(nk_ui_agreement_is_checked());
@@ -43,7 +43,7 @@ void test_nk_ui_agreement_flow(void) {
     TEST_ASSERT_EQUAL_UINT32(NK_DATA_CONSENT_CURRENT_VERSION, nk_data_consent_get_agreed_version());
 }
 
-void test_nk_ui_permissions_mic_denied_shows_warning(void) {
+static void test_nk_ui_permissions_mic_denied_shows_warning(void) {
     nk_ui_permissions_create(NULL, NULL);
 
     // 初期状態：エラー表示は隠れており、完了ボタンは無効

@@ -2,10 +2,6 @@
 # 使い方は README.md の「はじめかた」と、CMakePresets.json を参照
 cmake_minimum_required(VERSION 3.25)
 project(nemunoki VERSION 0.1.0 LANGUAGES C CXX)
-if(WIN32)
-    set(CMAKE_ASM_FLAGS_DEBUG "" CACHE STRING "" FORCE)
-    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>" CACHE STRING "" FORCE)
-endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -25,6 +21,8 @@ add_library(nk_options INTERFACE)
 if(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # clang-cl（Windows）
     target_compile_options(nk_options INTERFACE /W4)
+    # fopen などの標準 C の関数に「fopen_s を使え」と出る警告を止める（fopen_s は Linux・Android にない）
+    target_compile_definitions(nk_options INTERFACE _CRT_SECURE_NO_WARNINGS)
     if(NK_WARNINGS_AS_ERRORS)
         target_compile_options(nk_options INTERFACE /WX)
     endif()
@@ -57,7 +55,27 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
     set(SDL_UNIX_CONSOLE_BUILD ON CACHE BOOL "" FORCE)
 endif()
 add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
+
+# lvgl は clang-cl をアセンブラ（ASM）としても使う。
+# CMake 3.31 は clang-cl の ASM 用にデバッグ情報のオプションを用意していないため、
+# 構成の途中で「ProgramDatabase not known for this ASM compiler」と止まる。C と同じ -Zi を教えておく
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    set(CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_ProgramDatabase -Zi)
+endif()
 add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
+
+# lvgl は MSVC 向けに /Zc:preprocessor を付け、lvgl を使う側にも広げる。
+# clang-cl はこのオプションを使わず「使われなかった」と警告するため、/WX のときにビルドが止まる。
+# clang-cl のプリプロセッサは最初から標準どおりなので、外しても困らない
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    foreach(_prop COMPILE_OPTIONS INTERFACE_COMPILE_OPTIONS)
+        get_target_property(_opts lvgl ${_prop})
+        if(_opts)
+            list(REMOVE_ITEM _opts /Zc:preprocessor)
+            set_target_properties(lvgl PROPERTIES ${_prop} "${_opts}")
+        endif()
+    endforeach()
+endif()
 # add_subdirectory(third_party/sqlcipher EXCLUDE_FROM_ALL)
 
 # ------------------------------------------------------------------

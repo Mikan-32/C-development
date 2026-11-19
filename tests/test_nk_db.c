@@ -18,7 +18,7 @@ void tearDown(void) {
 }
 
 // 1. キーなし・空キーでは DB を開けないことを検証（Issue #28 完了条件）
-void test_nk_db_rejects_missing_or_empty_key(void) {
+static void test_nk_db_rejects_missing_or_empty_key(void) {
     TEST_ASSERT_NOT_EQUAL_INT(0, nk_db_open(":memory:", NULL, 0));
     TEST_ASSERT_FALSE(nk_db_is_open());
 
@@ -27,7 +27,7 @@ void test_nk_db_rejects_missing_or_empty_key(void) {
 }
 
 // 2. 誤ったキーでは既存DBを開けないことを検証
-void test_nk_db_rejects_wrong_key(void) {
+static void test_nk_db_rejects_wrong_key(void) {
     const char *correct_key = "correct_secret_key_999";
     const char *wrong_key = "wrong_password_000";
 
@@ -45,7 +45,7 @@ void test_nk_db_rejects_wrong_key(void) {
 }
 
 // 3. 1夜の削除と全削除ができ、削除後に履歴から消えることを検証（Issue #28 完了条件）
-void test_nk_data_session_delete_single_and_all(void) {
+static void test_nk_data_session_delete_single_and_all(void) {
     const char *key = "session_test_key";
     TEST_ASSERT_EQUAL_INT(0, nk_db_open(":memory:", key, (int)strlen(key)));
 

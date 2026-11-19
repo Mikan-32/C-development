@@ -24,18 +24,18 @@ static void refresh_ui(void) {
     // マイク権限表示（必須）
     if (s_mic_status == NK_PERM_STATUS_GRANTED) {
         lv_label_set_text(s_mic_status_label, "マイク（必須）：許可済み");
-        lv_obj_add_flag(s_error_box, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(s_error_box, true);
         lv_obj_clear_state(s_done_btn, LV_STATE_DISABLED);
         lv_label_set_text(s_req_btn_label, "権限が設定されました");
     } else if (s_mic_status == NK_PERM_STATUS_DENIED) {
         lv_label_set_text(s_mic_status_label, "マイク（必須）：拒否されました");
         // ST-PERM-MIC 拒否時の表示（UX-1 / Issue #28 要件）
-        lv_obj_clear_flag(s_error_box, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(s_error_box, false);
         lv_obj_add_state(s_done_btn, LV_STATE_DISABLED);
         lv_label_set_text(s_req_btn_label, "権限リクエストを再試行");
     } else {
         lv_label_set_text(s_mic_status_label, "マイク（必須）：リクエストされていません");
-        lv_obj_add_flag(s_error_box, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_hidden(s_error_box, true);
         lv_obj_add_state(s_done_btn, LV_STATE_DISABLED);
         lv_label_set_text(s_req_btn_label, "マイクと通知を許可");
     }
@@ -102,7 +102,7 @@ void nk_ui_permissions_create(nk_ui_permissions_on_done_cb on_done,
     s_error_box = lv_obj_create(s_screen_obj);
     lv_obj_set_size(s_error_box, 310, 95);
     lv_obj_align(s_error_box, LV_ALIGN_CENTER, 0, -15);
-    lv_obj_add_flag(s_error_box, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_hidden(s_error_box, true);
 
     lv_obj_t *err_lbl = lv_label_create(s_error_box);
     lv_obj_set_width(err_lbl, 280);
@@ -171,7 +171,7 @@ bool nk_ui_permissions_is_done_enabled(void) {
 }
 
 bool nk_ui_permissions_is_mic_denied_shown(void) {
-    return (s_error_box != NULL) ? !lv_obj_has_flag(s_error_box, LV_OBJ_FLAG_HIDDEN) : false;
+    return (s_error_box != NULL) ? !lv_obj_is_hidden(s_error_box) : false;
 }
 
 void nk_ui_permissions_click_request(void) {

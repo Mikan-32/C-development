@@ -4,17 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#if !defined(SQLITE_HAS_CODEC)
-int sqlite3_key(sqlite3 *db, const void *pKey, int nKey);
-
-int sqlite3_key(sqlite3 *db, const void *pKey, int nKey) {
-    (void)db;
-    (void)pKey;
-    (void)nKey;
-    return SQLITE_OK;
-}
-#endif
-
 static sqlite3 *s_db = NULL;
 
 // キー文字列から簡易検証トークンを生成する内部関数（PCモック検証用）
@@ -114,6 +103,7 @@ int nk_db_open(const char *path, const char *key, int key_len) {
         return rc;
     }
 
+#if defined(SQLITE_HAS_CODEC)
     // SQLCipher 暗号化キーの適用
     rc = sqlite3_key(s_db, key, key_len);
     if (rc != SQLITE_OK) {
@@ -121,7 +111,6 @@ int nk_db_open(const char *path, const char *key, int key_len) {
         return rc;
     }
 
-#if defined(SQLITE_HAS_CODEC)
     // 本番SQLCipher：実際にテーブル一覧が読めるか（復号成功か）を検証
     rc = sqlite3_exec(s_db, "SELECT count(*) FROM sqlite_master;", NULL, NULL, NULL);
     if (rc != SQLITE_OK) {
@@ -129,7 +118,7 @@ int nk_db_open(const char *path, const char *key, int key_len) {
         return rc;
     }
 #else
-    // PCモック環境：キーの整合性を検証
+    // PCモック環境（SQLCipher なし）：暗号化はせず、キーの整合性だけ検証する
     rc = verify_dev_key(s_db, key, key_len);
     if (rc != SQLITE_OK) {
         nk_db_close();
