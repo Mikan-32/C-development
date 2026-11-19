@@ -1,7 +1,7 @@
 # ねむのき：C 部分のビルド設定（PC 版と Android 版で共通）
 # 使い方は README.md の「はじめかた」と、CMakePresets.json を参照
 cmake_minimum_required(VERSION 3.25)
-project(nemunoki VERSION 0.1.0 LANGUAGES C CXX)
+project(nemunoki VERSION 0.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -20,7 +20,8 @@ add_library(nk_options INTERFACE)
 
 if(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # clang-cl（Windows）
-    target_compile_options(nk_options INTERFACE /W4)
+    # /utf-8：画面の日本語（UTF-8 のソース）を文字化けさせないため。clang-cl では既定と同じ
+    target_compile_options(nk_options INTERFACE /W4 /utf-8)
     # fopen などの標準 C の関数に「fopen_s を使え」と出る警告を止める（fopen_s は Linux・Android にない）
     target_compile_definitions(nk_options INTERFACE _CRT_SECURE_NO_WARNINGS)
     if(NK_WARNINGS_AS_ERRORS)
@@ -51,41 +52,68 @@ endif()
 # 外部ライブラリ（third_party に submodule を追加したら有効にする）
 # 注意点は third_party/README.md を参照
 # ------------------------------------------------------------------
-if(UNIX AND NOT APPLE AND NOT ANDROID)
-    set(SDL_UNIX_CONSOLE_BUILD ON CACHE BOOL "" FORCE)
-endif()
-add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
-
-# lvgl は clang-cl をアセンブラ（ASM）としても使う。
-# CMake 3.31 は clang-cl の ASM 用にデバッグ情報のオプションを用意していないため、
-# 構成の途中で「ProgramDatabase not known for this ASM compiler」と止まる。C と同じ -Zi を教えておく
-if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-    set(CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_ProgramDatabase -Zi)
-endif()
-add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
-
-# lvgl は MSVC 向けに /Zc:preprocessor を付け、lvgl を使う側にも広げる。
-# clang-cl はこのオプションを使わず「使われなかった」と警告するため、/WX のときにビルドが止まる。
-# clang-cl のプリプロセッサは最初から標準どおりなので、外しても困らない
-if(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-    foreach(_prop COMPILE_OPTIONS INTERFACE_COMPILE_OPTIONS)
-        get_target_property(_opts lvgl ${_prop})
-        if(_opts)
-            list(REMOVE_ITEM _opts /Zc:preprocessor)
-            set_target_properties(lvgl PROPERTIES ${_prop} "${_opts}")
+# 画面（SDL3＋LVGL）は、まず PC 版で動かす。
+# Android 版への組み込みは、android/ の Gradle プロジェクトを作るときに行う（SDL3 は共有ライブラリにする）
+if(NOT ANDROID)
+    # SDL3：静的ライブラリにしてアプリに入れる（PC 版で DLL を置かずに起動できるように）
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+    set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+    set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT DEFINED SDL_UNIX_CONSOLE_BUILD)
+        # X11 も Wayland も入っていない環境（CI）では、ウィンドウなしの SDL にする。
+        # 単体テストは SDL を使わないので、ウィンドウなしでも動く
+        find_package(X11 QUIET)
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(NK_WAYLAND QUIET wayland-client)
         endif()
-    endforeach()
+        if(NOT X11_FOUND AND NOT NK_WAYLAND_FOUND)
+            message(STATUS "X11 と Wayland が見つからないため、SDL をウィンドウなしでビルドします")
+            set(SDL_UNIX_CONSOLE_BUILD ON)
+        endif()
+    endif()
+    add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL SYSTEM)
+
+    # LVGL：third_party/lvgl/src の C ファイルを直接ビルドする。
+    # 同梱の CMake は C++・アセンブラ・ThorVG も有効にするため使わない。設定は src/ui/lv_conf.h
+    file(GLOB_RECURSE NK_LVGL_SOURCES CONFIGURE_DEPENDS
+         "${PROJECT_SOURCE_DIR}/third_party/lvgl/src/*.c")
+    add_library(lvgl STATIC ${NK_LVGL_SOURCES})
+    target_include_directories(lvgl SYSTEM PUBLIC "${PROJECT_SOURCE_DIR}/third_party/lvgl")
+    target_include_directories(lvgl PRIVATE "${PROJECT_SOURCE_DIR}/src/ui")
+    target_compile_definitions(lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE LV_LVGL_H_INCLUDE_SIMPLE
+                                           LV_KCONFIG_IGNORE)
+    # LVGL は C11 にない関数（strnlen など）を使う。-std=c11 のままだと Linux（glibc）で
+    # 宣言されず、clang 16 以降はエラーになるため、LVGL だけ GNU 拡張つき（gnu11）でビルドする
+    set_target_properties(lvgl PROPERTIES C_EXTENSIONS ON)
+    if(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        target_compile_options(lvgl PRIVATE /W0 /utf-8)
+    else()
+        target_compile_options(lvgl PRIVATE -w)
+    endif()
+    if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+        # MSVC の cl では、LVGL の可変長引数のマクロに標準どおりのプリプロセッサが要る
+        target_compile_options(lvgl PUBLIC /Zc:preprocessor)
+    endif()
+    if(UNIX)
+        target_link_libraries(lvgl PUBLIC m)
+    endif()
 endif()
-# add_subdirectory(third_party/sqlcipher EXCLUDE_FROM_ALL)
 
 # ------------------------------------------------------------------
 # コンポーネント（実装を始めたら追加する）
 # 各コンポーネントは静的ライブラリ nk_<名前> として定義し、nk_options をリンクする
 # ------------------------------------------------------------------
 # add_subdirectory(src/common)
-add_subdirectory(src/ui)
+# data：データベース（SQLite）と同意・睡眠記録。画面を使わないので Android 版でもビルドする
 add_subdirectory(src/data)
 if(NOT ANDROID)
+    add_subdirectory(src/ui)
+    add_subdirectory(src/app)
+    # 初回起動の同意と権限の画面（UX-1・Issue #28）を、単独で動かして確かめる PC 版
     add_subdirectory(platform/pc)
 endif()
 
