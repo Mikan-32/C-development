@@ -2,6 +2,10 @@
 # 使い方は README.md の「はじめかた」と、CMakePresets.json を参照
 cmake_minimum_required(VERSION 3.25)
 project(nemunoki VERSION 0.1.0 LANGUAGES C CXX)
+if(WIN32)
+    set(CMAKE_ASM_FLAGS_DEBUG "" CACHE STRING "" FORCE)
+    set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>" CACHE STRING "" FORCE)
+endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -49,6 +53,9 @@ endif()
 # 外部ライブラリ（third_party に submodule を追加したら有効にする）
 # 注意点は third_party/README.md を参照
 # ------------------------------------------------------------------
+if(UNIX AND NOT APPLE AND NOT ANDROID)
+    set(SDL_UNIX_CONSOLE_BUILD ON CACHE BOOL "" FORCE)
+endif()
 add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
 # add_subdirectory(third_party/sqlcipher EXCLUDE_FROM_ALL)

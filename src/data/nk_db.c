@@ -5,6 +5,8 @@
 #include <string.h>
 
 #if !defined(SQLITE_HAS_CODEC)
+int sqlite3_key(sqlite3 *db, const void *pKey, int nKey);
+
 int sqlite3_key(sqlite3 *db, const void *pKey, int nKey) {
     (void)db;
     (void)pKey;
