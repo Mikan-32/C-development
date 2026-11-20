@@ -52,4 +52,25 @@ nk_result nk_android_bridge_night_start(unsigned int flags, const char *title, c
  */
 nk_result nk_android_bridge_night_stop(void);
 
+/*
+ * NativeBridge.kt の NIGHT_* と同じ値。
+ */
+typedef enum nk_android_night_state {
+    NK_ANDROID_NIGHT_STARTED = 0,
+    NK_ANDROID_NIGHT_STOPPED = 1,
+    NK_ANDROID_NIGHT_FAILED = 2
+} nk_android_night_state;
+
+/*
+ * Kotlinから最後に通知された状態。
+ * 開始・停止要求を送った直後は、以前の状態の場合がある。
+ */
+nk_android_night_state nk_android_bridge_night_state(void);
+
+/*
+ * 通知が許可されていれば*out_allowedへ1、
+ * 許可されていなければ0を返す。
+ */
+nk_result nk_android_bridge_notifications_allowed(int *out_allowed);
+
 #endif

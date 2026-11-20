@@ -28,7 +28,8 @@ typedef enum nk_result {
     /* 計測が開始されていない。 */
     NK_ERROR_NOT_RUNNING = -6,
     NK_ERROR_IO = -7,
-    NK_ERROR_FORMAT = -8
+    NK_ERROR_FORMAT = -8,
+    NK_ERROR_PERMISSION_REQUIRED = -9
 } nk_result;
 
 #endif

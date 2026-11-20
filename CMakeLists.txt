@@ -85,6 +85,7 @@ if(ANDROID)
         platform/android/c/android_main.c
         platform/android/c/android_bridge.c
         platform/android/c/android_consent.c
+        platform/android/c/android_night.c
     )
 
     target_link_libraries(main PRIVATE

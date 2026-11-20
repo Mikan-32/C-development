@@ -1,5 +1,6 @@
 #include "android_bridge.h"
 #include "android_consent.h"
+#include "android_night.h"
 #include "data.h"
 
 #include <SDL3/SDL.h>
@@ -128,6 +129,8 @@ int main(int argc, char *argv[]) {
 
     (void)__android_log_print(ANDROID_LOG_INFO, NK_LOG_TAG, "%s", cipher_version);
 
+    nk_android_night_ui_init();
+
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         SDL_Quit();
@@ -186,6 +189,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    bool drawing_enabled = true;
+
     while (running) {
         SDL_Event event;
 
@@ -197,10 +202,30 @@ int main(int argc, char *argv[]) {
             if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
                 running = false;
             }
+
+            if (!running) {
+                break;
+            }
+
+            if (event.type == SDL_EVENT_WILL_ENTER_BACKGROUND) {
+                drawing_enabled = false;
+            } else if (event.type == SDL_EVENT_DID_ENTER_FOREGROUND) {
+                drawing_enabled = true;
+            }
+
+            if (drawing_enabled) {
+                (void)nk_android_night_ui_event(database_result == NK_OK ? database : NULL,
+                                                renderer, &event);
+            }
         }
 
         if (!running) {
             break;
+        }
+
+        if (!drawing_enabled) {
+            SDL_Delay(100);
+            continue;
         }
 
         if (!SDL_SetRenderDrawColor(renderer, 20, 25, 35, 255) || !SDL_RenderClear(renderer) ||
@@ -210,7 +235,7 @@ int main(int argc, char *argv[]) {
             !SDL_RenderDebugText(renderer, 20.0f, 120.0f, database_status) ||
             !SDL_RenderDebugText(renderer, 20.0f, 160.0f, consent_status) ||
             !SDL_RenderDebugText(renderer, 20.0f, 200.0f, "Measurement is not running.") ||
-            !SDL_RenderPresent(renderer)) {
+            nk_android_night_ui_draw(renderer) != NK_OK || !SDL_RenderPresent(renderer)) {
             SDL_Log("Rendering failed: %s", SDL_GetError());
             exit_code = 1;
             break;
@@ -220,6 +245,12 @@ int main(int argc, char *argv[]) {
     }
 
 cleanup:
+
+    if (nk_android_night_ui_shutdown() != NK_OK) {
+        (void)__android_log_print(ANDROID_LOG_ERROR, NK_LOG_TAG, "Night service shutdown failed");
+        exit_code = 1;
+    }
+
     if (renderer != NULL) {
         SDL_DestroyRenderer(renderer);
     }

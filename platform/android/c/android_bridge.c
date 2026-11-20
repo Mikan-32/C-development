@@ -3,6 +3,7 @@
 #include <SDL3/SDL_system.h>
 #include <android/log.h>
 #include <jni.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 
 #define NK_BRIDGE_TAG "NkAndroid"
@@ -15,6 +16,8 @@ typedef struct nk_android_bridge_cache {
 } nk_android_bridge_cache;
 
 static nk_android_bridge_cache bridge;
+
+static atomic_int night_state = NK_ANDROID_NIGHT_STOPPED;
 
 static bool clear_exception(JNIEnv *env, const char *operation) {
     if ((*env)->ExceptionCheck(env)) {
@@ -255,6 +258,89 @@ nk_result nk_android_bridge_night_stop(void) {
     (*env)->CallStaticVoidMethod(env, bridge.bridge_class, bridge.night_stop);
 
     return clear_exception(env, "nightServiceStop") ? NK_ERROR_IO : NK_OK;
+}
+
+nk_android_night_state nk_android_bridge_night_state(void) {
+    return (nk_android_night_state)atomic_load(&night_state);
+}
+
+nk_result nk_android_bridge_notifications_allowed(int *out_allowed) {
+    JNIEnv *env;
+    jmethodID method;
+    jboolean allowed;
+
+    if (out_allowed == NULL) {
+        return NK_ERROR_ARGUMENT;
+    }
+
+    *out_allowed = 0;
+
+    env = current_env();
+    if (env == NULL) {
+        return NK_ERROR_IO;
+    }
+
+    method = (*env)->GetStaticMethodID(env, bridge.bridge_class, "capability", "(I)Z");
+
+    if (clear_exception(env, "notification capability") || method == NULL) {
+        return NK_ERROR_IO;
+    }
+
+    /* NativeBridge.CAP_NOTIFICATIONS = 2. */
+    allowed = (*env)->CallStaticBooleanMethod(env, bridge.bridge_class, method, (jint)2);
+
+    if (clear_exception(env, "notification capability")) {
+        return NK_ERROR_IO;
+    }
+
+    *out_allowed = allowed == JNI_TRUE;
+    return NK_OK;
+}
+
+JNIEXPORT void JNICALL Java_io_github_mikan32_nemunoki_platform_NativeBridge_nativeOnNightService(
+    JNIEnv *env, jclass bridge_class, jint state);
+
+JNIEXPORT void JNICALL Java_io_github_mikan32_nemunoki_platform_NativeBridge_nativeOnNightService(
+    JNIEnv *env, jclass bridge_class, jint state) {
+    static const char *names[] = {"started", "stopped", "failed"};
+
+    (void)env;
+    (void)bridge_class;
+
+    if (state < 0 || state > 2) {
+        (void)__android_log_print(ANDROID_LOG_ERROR, NK_BRIDGE_TAG,
+                                  "Invalid night service state: %d", (int)state);
+        return;
+    }
+
+    atomic_store(&night_state, (int)state);
+
+    (void)__android_log_print(ANDROID_LOG_INFO, NK_BRIDGE_TAG, "Night service state: %s",
+                              names[state]);
+}
+
+JNIEXPORT void JNICALL
+Java_io_github_mikan32_nemunoki_platform_NativeBridge_nativeOnNotificationAction(
+    JNIEnv *env, jclass bridge_class, jint action, jint id, jint timeout_ms);
+
+JNIEXPORT void JNICALL
+Java_io_github_mikan32_nemunoki_platform_NativeBridge_nativeOnNotificationAction(
+    JNIEnv *env, jclass bridge_class, jint action, jint id, jint timeout_ms) {
+    (void)env;
+    (void)bridge_class;
+    (void)id;
+    (void)timeout_ms;
+
+    /* NativeBridge.ACT_STOP_TRACKING = 2. */
+    if (action == 2) {
+        nk_result result = nk_android_bridge_night_stop();
+
+        (void)__android_log_print(result == NK_OK ? ANDROID_LOG_INFO : ANDROID_LOG_ERROR,
+                                  NK_BRIDGE_TAG, "Notification stop request: %d", (int)result);
+    } else {
+        (void)__android_log_print(ANDROID_LOG_INFO, NK_BRIDGE_TAG,
+                                  "Notification action not implemented here: %d", (int)action);
+    }
 }
 
 /* END NK_ANDROID_BRIDGE_C */
