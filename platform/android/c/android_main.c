@@ -1,4 +1,5 @@
 #include "android_bridge.h"
+#include "android_consent.h"
 #include "data.h"
 
 #include <SDL3/SDL.h>
@@ -168,6 +169,21 @@ int main(int argc, char *argv[]) {
         SDL_Log("Display setup failed: %s", SDL_GetError());
         exit_code = 1;
         goto cleanup;
+    }
+
+    if (database_result == NK_OK && !has_consent) {
+        nk_result consent_result = nk_android_consent_request(window, database, &has_consent);
+
+        if (consent_result == NK_OK) {
+            consent_status =
+                has_consent ? "Measurement consent: granted" : "Measurement consent: not granted";
+        } else {
+            consent_status = "Measurement consent: unavailable";
+            exit_code = 1;
+
+            (void)__android_log_print(ANDROID_LOG_ERROR, NK_LOG_TAG,
+                                      "Consent confirmation failed: %d", (int)consent_result);
+        }
     }
 
     while (running) {

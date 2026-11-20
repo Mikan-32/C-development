@@ -84,6 +84,7 @@ if(ANDROID)
     add_library(main SHARED
         platform/android/c/android_main.c
         platform/android/c/android_bridge.c
+        platform/android/c/android_consent.c
     )
 
     target_link_libraries(main PRIVATE
