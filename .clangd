@@ -3,6 +3,8 @@ CompileFlags:
 
 ---
 If:
-  PathMatch: platform/android/.*
+  PathMatch:
+    - platform/android/.*
+    - third_party/SDL/include/.*
 CompileFlags:
   CompilationDatabase: build/android-core-arm64
