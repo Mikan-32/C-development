@@ -2,16 +2,19 @@
 
 #include "android_accel.h"
 
+#include "accel_features.h"
 #include "android_bridge.h"
 
 #include <android/log.h>
 #include <android/looper.h>
 #include <android/sensor.h>
 #include <errno.h>
+#include <math.h>
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <time.h>
 
 #define NK_ACCEL_TAG         "NkAndroid"
@@ -30,12 +33,45 @@ static atomic_bool stop_requested = true;
 static atomic_bool worker_finished = true;
 static atomic_int status = ACCEL_STOPPED;
 
-static void log_count(int64_t second, unsigned int count, bool partial) {
-    if (count != 0U) {
-        (void)__android_log_print(ANDROID_LOG_INFO, NK_ACCEL_TAG,
-                                  "Accelerometer: sensor_second=%lld samples=%u partial=%d",
-                                  (long long)second, count, partial ? 1 : 0);
+#define NK_ACC_NS              INT64_C(1000000000)
+#define NK_ACC_MAX_DELIVERY_NS (INT64_C(10) * NK_ACC_NS)
+
+static nk_result boot_time_ns(int64_t *out_ns) {
+    struct timespec value;
+    if (clock_gettime(CLOCK_BOOTTIME, &value) != 0 || value.tv_sec < 0 ||
+        value.tv_sec >= INT64_MAX / NK_ACC_NS || value.tv_nsec < 0 || value.tv_nsec >= NK_ACC_NS) {
+        return NK_ERROR_IO;
     }
+    *out_ns = (int64_t)value.tv_sec * NK_ACC_NS + value.tv_nsec;
+    return NK_OK;
+}
+
+static nk_result receive_second(void *user_data, const nk_sensing_second *second) {
+    int *next_idx = user_data;
+    char hp_text[48] = "NULL";
+    char gravity_text[96] = "NULL";
+    const char *moving = "NULL";
+    int length;
+
+    if (second->acc_hp.has_value) {
+        length = snprintf(hp_text, sizeof(hp_text), "%.3f", second->acc_hp.value);
+        if (length < 0 || (size_t)length >= sizeof(hp_text)) {
+            return NK_ERROR_FORMAT;
+        }
+        moving = second->acc_hp.value > 15.0 ? "1" : "0";
+    }
+    if (second->gravity.has_value) {
+        length = snprintf(gravity_text, sizeof(gravity_text), "(%.4f,%.4f,%.4f)", second->gravity.x,
+                          second->gravity.y, second->gravity.z);
+        if (length < 0 || (size_t)length >= sizeof(gravity_text)) {
+            return NK_ERROR_FORMAT;
+        }
+    }
+    (void)__android_log_print(ANDROID_LOG_INFO, NK_ACCEL_TAG,
+                              "ACC 1s: idx=%d samples=%d acc_hp_mg=%s moving=%s gravity=%s",
+                              second->idx, second->acc_sample_count, hp_text, moving, gravity_text);
+    *next_idx = second->idx + 1;
+    return NK_OK;
 }
 
 static bool wait_for_service(void) {
@@ -60,13 +96,15 @@ static bool wait_for_service(void) {
 static void *read_accelerometer(void *unused) {
     ALooper *looper;
     ASensorEventQueue *queue = NULL;
+    nk_accel_features *features = NULL;
     bool enabled = false;
     bool failed = false;
-    bool first_second = true;
-    int64_t second = -1;
+    int next_idx = 0;
+    int64_t origin_ns = 0;
     int64_t last_timestamp = -1;
-    unsigned int count = 0;
     uint64_t total = 0;
+    uint64_t late_samples = 0;
+    uint64_t invalid_samples = 0;
 
     (void)unused;
 
@@ -88,7 +126,9 @@ static void *read_accelerometer(void *unused) {
         goto cleanup;
     }
     queue = ASensorManager_createEventQueue(manager, looper, NK_ACCEL_QUEUE_ID, NULL, NULL);
-    if (queue == NULL || ASensorEventQueue_enableSensor(queue, sensor) < 0) {
+    if (queue == NULL || boot_time_ns(&origin_ns) != NK_OK ||
+        nk_accel_features_create(&features, origin_ns, receive_second, &next_idx) != NK_OK ||
+        ASensorEventQueue_enableSensor(queue, sensor) < 0) {
         failed = true;
         goto cleanup;
     }
@@ -106,31 +146,36 @@ static void *read_accelerometer(void *unused) {
     while (!atomic_load(&stop_requested)) {
         ASensorEvent events[32];
         ssize_t received = 0;
+        int64_t now_ns;
         int poll_result = ALooper_pollOnce(NK_ACCEL_POLL_MS, NULL, NULL, NULL);
 
         if (poll_result == ALOOPER_POLL_ERROR) {
             failed = true;
             break;
         }
-        /* Bounded batches keep stop requests responsive even under a backlog. */
         while (!atomic_load(&stop_requested) &&
                (received = ASensorEventQueue_getEvents(queue, events, 32)) > 0) {
             for (ssize_t i = 0; i < received; ++i) {
-                int64_t event_second;
-
-                if (events[i].type != ASENSOR_TYPE_ACCELEROMETER ||
-                    events[i].timestamp <= last_timestamp) {
+                const ASensorEvent *event = &events[i];
+                if (event->type != ASENSOR_TYPE_ACCELEROMETER) {
                     continue;
                 }
-                last_timestamp = events[i].timestamp;
-                event_second = events[i].timestamp / INT64_C(1000000000);
-                if (second >= 0 && event_second != second) {
-                    log_count(second, count, first_second);
-                    first_second = false;
-                    count = 0;
+                if (event->timestamp < origin_ns || event->timestamp <= last_timestamp ||
+                    (event->timestamp - origin_ns) / NK_ACC_NS < next_idx) {
+                    ++late_samples;
+                    continue;
                 }
-                second = event_second;
-                ++count;
+                if (!isfinite(event->acceleration.x) || !isfinite(event->acceleration.y) ||
+                    !isfinite(event->acceleration.z)) {
+                    ++invalid_samples;
+                    continue;
+                }
+                if (nk_accel_features_push(features, event->timestamp, event->acceleration.x,
+                                           event->acceleration.y, event->acceleration.z) != NK_OK) {
+                    failed = true;
+                    goto cleanup;
+                }
+                last_timestamp = event->timestamp;
                 ++total;
             }
         }
@@ -139,22 +184,42 @@ static void *read_accelerometer(void *unused) {
             failed = true;
             break;
         }
+        if (boot_time_ns(&now_ns) != NK_OK) {
+            failed = true;
+            break;
+        }
+        /* Leave up to 10 seconds for sensor delivery before declaring silence. */
+        if (now_ns - origin_ns > NK_ACC_MAX_DELIVERY_NS &&
+            nk_accel_features_advance(features, now_ns - NK_ACC_MAX_DELIVERY_NS) != NK_OK) {
+            failed = true;
+            break;
+        }
     }
 
 cleanup:
-    log_count(second, count, true);
     if (enabled && ASensorEventQueue_disableSensor(queue, sensor) < 0) {
         failed = true;
     }
     if (queue != NULL && ASensorManager_destroyEventQueue(manager, queue) < 0) {
         failed = true;
     }
+    if (features != NULL) {
+        int64_t end_ns;
+        if (boot_time_ns(&end_ns) != NK_OK || nk_accel_features_finish(features, end_ns) != NK_OK) {
+            failed = true;
+        }
+        nk_accel_features_destroy(features);
+    }
+    if (late_samples != 0 || invalid_samples != 0) {
+        (void)__android_log_print(
+            ANDROID_LOG_INFO, NK_ACCEL_TAG, "Accelerometer skipped: late=%llu invalid=%llu",
+            (unsigned long long)late_samples, (unsigned long long)invalid_samples);
+    }
     atomic_store(&status, failed ? ACCEL_FAILED : ACCEL_STOPPED);
     (void)__android_log_print(failed ? ANDROID_LOG_ERROR : ANDROID_LOG_INFO, NK_ACCEL_TAG,
                               "Accelerometer %s: total_samples=%llu", failed ? "failed" : "stopped",
                               (unsigned long long)total);
     if (failed) {
-        /* Avoid leaving the foreground service running after a sensor failure. */
         (void)nk_android_bridge_night_stop();
     }
     atomic_store(&worker_finished, true);

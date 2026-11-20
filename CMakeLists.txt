@@ -239,4 +239,21 @@ if(NK_BUILD_TESTS AND NOT ANDROID)
         )
     endif() # NK_ENABLE_LOCAL_WAV_TESTS
 
+    if(NK_BUILD_TESTS AND NOT ANDROID)
+        add_executable(nk_accel_features_check
+            tests/unit/accel_features_check.c
+        )
+
+        target_link_libraries(nk_accel_features_check PRIVATE
+            nk_unity
+            nk_sensing
+            nk_options
+        )
+
+        add_test(
+            NAME accel_features
+            COMMAND nk_accel_features_check
+        )
+        endif()
+
 endif() # NK_BUILD_TESTS AND NOT ANDROID

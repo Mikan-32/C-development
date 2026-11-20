@@ -21,3 +21,5 @@ if(UNIX)
             m
     )
 endif()
+
+target_sources(nk_sensing PRIVATE accel_features.c)
