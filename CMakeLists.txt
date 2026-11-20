@@ -255,4 +255,19 @@ if(NK_BUILD_TESTS AND NOT ANDROID)
         COMMAND nk_accel_features_check
     )
 
+    add_executable(nk_data_recovery_check
+        tests/unit/data_recovery_check.c
+    )
+
+    target_link_libraries(nk_data_recovery_check PRIVATE
+        nk_data
+        nk_unity
+        nk_options
+    )
+
+    add_test(
+        NAME data_recovery
+        COMMAND nk_data_recovery_check
+    )
+
 endif() # NK_BUILD_TESTS AND NOT ANDROID

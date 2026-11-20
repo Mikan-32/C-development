@@ -1,7 +1,11 @@
+#define _POSIX_C_SOURCE 200809L
+
+#include "android_accel.h"
 #include "android_bridge.h"
 #include "android_consent.h"
 #include "android_night.h"
 #include "data.h"
+#include "data_recovery.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -10,8 +14,11 @@
 #include <sqlcipher/sqlite3.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <time.h>
 
 #define NK_LOG_TAG "NkAndroid"
+
+static nk_data_recovery_report startup_recovery;
 
 JNIEXPORT void JNICALL Java_io_github_mikan32_nemunoki_platform_NativeBridge_nativeOnLaunch(
     JNIEnv *env, jclass bridge_class, jint reason, jint id);
@@ -51,6 +58,7 @@ static nk_result open_application_database(nk_data **out_data, int *out_has_cons
     }
     *out_data = NULL;
     *out_has_consent = 0;
+    startup_recovery = (nk_data_recovery_report){0};
 
     directory = SDL_GetPrefPath("Mikan-32", "Nemunoki");
     if (directory == NULL) {
@@ -75,6 +83,33 @@ static nk_result open_application_database(nk_data **out_data, int *out_has_cons
     if (result != NK_OK) {
         goto cleanup;
     }
+    /* A live worker must never be mistaken for a process that died. */
+    if (!nk_android_accel_is_active()) {
+        SDL_Time now;
+        if (!SDL_GetCurrentTime(&now) || now < 0) {
+            result = NK_ERROR_IO;
+            goto cleanup;
+        }
+        result = nk_data_recover_unfinished(*out_data, (int64_t)(now / 1000000), &startup_recovery);
+        if (result != NK_OK) {
+            goto cleanup;
+        }
+        (void)__android_log_print(
+            ANDROID_LOG_INFO, NK_LOG_TAG,
+            "Recovery check: recovered=%d interrupted=%d user_stops=%d epochs_added=%d q04=%d",
+            startup_recovery.recovered_sessions, startup_recovery.interrupted_sessions,
+            startup_recovery.completed_user_stops, startup_recovery.added_epochs,
+            startup_recovery.q04_sessions);
+        if (startup_recovery.has_interruption) {
+            (void)__android_log_print(
+                ANDROID_LOG_INFO, NK_LOG_TAG,
+                "Q04 stored: session=%lld end_reason=SERVICE_KILLED gap_start_ms=%lld "
+                "gap_end_ms=%lld duration_ms=%lld",
+                (long long)startup_recovery.interrupted_session_id,
+                (long long)startup_recovery.gap_start_ms, (long long)startup_recovery.gap_end_ms,
+                (long long)(startup_recovery.gap_end_ms - startup_recovery.gap_start_ms));
+        }
+    }
     result = nk_data_has_measurement_consent(*out_data, out_has_consent);
 
 cleanup:
@@ -85,6 +120,37 @@ cleanup:
         *out_has_consent = 0;
     }
     return result;
+}
+
+static void recovery_time_text(char *buffer, size_t size, const char *label, int64_t utc_ms) {
+    time_t instant = (time_t)(utc_ms / 1000);
+    struct tm local;
+    char time_text[32];
+    if ((int64_t)instant == utc_ms / 1000 && localtime_r(&instant, &local) != NULL &&
+        strftime(time_text, sizeof(time_text), "%m-%d %H:%M:%S", &local) != 0) {
+        (void)snprintf(buffer, size, "%s%s", label, time_text);
+    } else {
+        (void)snprintf(buffer, size, "%sUTC ms %lld", label, (long long)utc_ms);
+    }
+}
+
+static bool draw_recovery_status(SDL_Renderer *renderer) {
+    char id[64];
+    char from[64];
+    char to[64];
+    if (!startup_recovery.has_interruption) {
+        return startup_recovery.recovered_sessions == 0 ||
+               SDL_RenderDebugText(renderer, 20.0f, 470.0f, "Previous recording finalized");
+    }
+    (void)snprintf(id, sizeof(id), "Previous Q04 session: %lld",
+                   (long long)startup_recovery.interrupted_session_id);
+    recovery_time_text(from, sizeof(from), "From: ", startup_recovery.gap_start_ms);
+    recovery_time_text(to, sizeof(to), "To:   ", startup_recovery.gap_end_ms);
+    return SDL_RenderDebugText(renderer, 20.0f, 470.0f, id) &&
+           SDL_RenderDebugText(renderer, 20.0f, 495.0f, "Recording was interrupted") &&
+           SDL_RenderDebugText(renderer, 20.0f, 520.0f, from) &&
+           SDL_RenderDebugText(renderer, 20.0f, 545.0f, to) &&
+           SDL_RenderDebugText(renderer, 20.0f, 575.0f, "Start: last valid saved epoch");
 }
 
 int main(int argc, char *argv[]) {
@@ -196,7 +262,8 @@ int main(int argc, char *argv[]) {
             !SDL_RenderDebugText(renderer, 20.0f, 120.0f, database_status) ||
             !SDL_RenderDebugText(renderer, 20.0f, 160.0f, consent_status) ||
             !SDL_RenderDebugText(renderer, 20.0f, 200.0f, "Accelerometer mode; encrypted DB") ||
-            nk_android_night_ui_draw(renderer) != NK_OK || !SDL_RenderPresent(renderer)) {
+            nk_android_night_ui_draw(renderer) != NK_OK || !draw_recovery_status(renderer) ||
+            !SDL_RenderPresent(renderer)) {
             SDL_Log("Rendering failed: %s", SDL_GetError());
             exit_code = 1;
             break;
