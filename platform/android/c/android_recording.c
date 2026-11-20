@@ -9,6 +9,7 @@
 #include <android/log.h>
 #include <sqlcipher/sqlite3.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/system_properties.h>
@@ -246,15 +247,27 @@ nk_result nk_android_recording_push_second(nk_android_recording *recording,
 }
 
 static nk_result verify_saved(nk_android_recording *recording, int64_t end_ms) {
-    static const char sql[] = "SELECT end_ms,"
-                              "(SELECT COUNT(*) FROM epoch WHERE session_id=?1),"
-                              "(SELECT COUNT(*) FROM event WHERE session_id=?1) "
-                              "FROM session WHERE id=?1;";
+    static const char sql[] =
+        "SELECT end_ms,"
+        "(SELECT COUNT(*) FROM epoch WHERE session_id=s.id),"
+        "(SELECT COUNT(*) FROM event WHERE session_id=s.id),start_ms,battery_start,battery_end,"
+        "(SELECT COUNT(*) FROM epoch WHERE session_id=s.id AND acc_cov>=0.8),"
+        "(SELECT COUNT(*) FROM epoch WHERE session_id=s.id AND (flags&16)!=0),"
+        "(SELECT MIN(idx) FROM epoch WHERE session_id=s.id),"
+        "(SELECT MAX(idx) FROM epoch WHERE session_id=s.id) "
+        "FROM session AS s WHERE id=?1;";
     sqlite3 *database = NULL;
     sqlite3_stmt *statement = NULL;
     unsigned char key[NK_ANDROID_DB_KEY_SIZE] = {0};
     nk_result result = NK_ERROR_DATABASE;
     int events = 0;
+    int good_epochs = 0;
+    int charging_epochs = 0;
+    int64_t duration_ms = 0;
+    int64_t expected_epochs = 0;
+    char battery_start[16] = "unknown";
+    char battery_end[16] = "unknown";
+    char battery_drop[16] = "unknown";
     if (sqlite3_open_v2(recording->path, &database, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK ||
         sqlite3_busy_timeout(database, 5000) != SQLITE_OK ||
         nk_android_bridge_db_key(key, sizeof(key)) != NK_OK ||
@@ -266,12 +279,36 @@ static nk_result verify_saved(nk_android_recording *recording, int64_t end_ms) {
         sqlite3_bind_int64(statement, 1, (sqlite3_int64)recording->id) != SQLITE_OK ||
         sqlite3_step(statement) != SQLITE_ROW || sqlite3_column_type(statement, 0) == SQLITE_NULL ||
         sqlite3_column_int64(statement, 0) != end_ms ||
-        sqlite3_column_int(statement, 1) != recording->saved_epochs) {
+        sqlite3_column_int64(statement, 3) != recording->start_ms || end_ms < recording->start_ms ||
+        sqlite3_column_int64(statement, 1) != recording->saved_epochs) {
         goto cleanup;
     }
+    duration_ms = end_ms - recording->start_ms;
+    expected_epochs = duration_ms / 30000 + (duration_ms % 30000 != 0);
     events = sqlite3_column_int(statement, 2);
-    if (events < recording->saved_events) {
+    good_epochs = sqlite3_column_int(statement, 6);
+    charging_epochs = sqlite3_column_int(statement, 7);
+    if (events < recording->saved_events || recording->saved_epochs > expected_epochs ||
+        (recording->saved_epochs > 0 && (sqlite3_column_int64(statement, 8) < 0 ||
+                                         sqlite3_column_int64(statement, 9) >= expected_epochs))) {
         goto cleanup;
+    }
+    int has_start = sqlite3_column_type(statement, 4) != SQLITE_NULL;
+    int has_end = sqlite3_column_type(statement, 5) != SQLITE_NULL;
+    int start_percent = sqlite3_column_int(statement, 4);
+    int end_percent = sqlite3_column_int(statement, 5);
+    if (has_start && start_percent >= 0 && start_percent <= 100) {
+        (void)snprintf(battery_start, sizeof(battery_start), "%d", start_percent);
+    } else {
+        has_start = 0;
+    }
+    if (has_end && end_percent >= 0 && end_percent <= 100) {
+        (void)snprintf(battery_end, sizeof(battery_end), "%d", end_percent);
+    } else {
+        has_end = 0;
+    }
+    if (has_start && has_end) {
+        (void)snprintf(battery_drop, sizeof(battery_drop), "%d", start_percent - end_percent);
     }
     result = NK_OK;
 cleanup:
@@ -292,6 +329,26 @@ cleanup:
         (void)__android_log_print(ANDROID_LOG_INFO, NK_RECORDING_TAG,
                                   "DB verified: session=%lld finished=1 epochs=%d events=%d",
                                   (long long)recording->id, recording->saved_epochs, events);
+        /* Include missing rows in the denominator; an absent epoch is not healthy data. */
+        if (expected_epochs > 0) {
+            (void)__android_log_print(
+                ANDROID_LOG_INFO, NK_RECORDING_TAG,
+                "TM02 summary: session=%lld duration_ms=%lld expected_epochs=%lld epochs=%d "
+                "good_acc_epochs=%d good_acc_pct=%.3f missing_epochs=%lld charging_epochs=%d",
+                (long long)recording->id, (long long)duration_ms, (long long)expected_epochs,
+                recording->saved_epochs, good_epochs, 100.0 * good_epochs / expected_epochs,
+                (long long)(expected_epochs - recording->saved_epochs), charging_epochs);
+        } else {
+            (void)__android_log_print(
+                ANDROID_LOG_INFO, NK_RECORDING_TAG,
+                "TM02 summary: session=%lld duration_ms=0 expected_epochs=0 epochs=0 "
+                "good_acc_epochs=0 good_acc_pct=unknown missing_epochs=0 charging_epochs=0",
+                (long long)recording->id);
+        }
+        (void)__android_log_print(ANDROID_LOG_INFO, NK_RECORDING_TAG,
+                                  "TM02 battery: session=%lld start_pct=%s end_pct=%s drop_pp=%s",
+                                  (long long)recording->id, battery_start, battery_end,
+                                  battery_drop);
     } else {
         log_error(recording, "readback", result);
     }
