@@ -1,0 +1,8 @@
+CompileFlags:
+  CompilationDatabase: build/windows-clang
+
+---
+If:
+  PathMatch: platform/android/.*
+CompileFlags:
+  CompilationDatabase: build/android-core-arm64
