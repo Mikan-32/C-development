@@ -234,7 +234,8 @@ int main(int argc, char *argv[]) {
             !SDL_RenderDebugText(renderer, 20.0f, 80.0f, cipher_version) ||
             !SDL_RenderDebugText(renderer, 20.0f, 120.0f, database_status) ||
             !SDL_RenderDebugText(renderer, 20.0f, 160.0f, consent_status) ||
-            !SDL_RenderDebugText(renderer, 20.0f, 200.0f, "Measurement is not running.") ||
+            !SDL_RenderDebugText(renderer, 20.0f, 200.0f,
+                                 "Accelerometer check; DB saving pending") ||
             nk_android_night_ui_draw(renderer) != NK_OK || !SDL_RenderPresent(renderer)) {
             SDL_Log("Rendering failed: %s", SDL_GetError());
             exit_code = 1;

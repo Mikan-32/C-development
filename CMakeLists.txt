@@ -86,6 +86,7 @@ if(ANDROID)
         platform/android/c/android_bridge.c
         platform/android/c/android_consent.c
         platform/android/c/android_night.c
+        platform/android/c/android_accel.c
     )
 
     target_link_libraries(main PRIVATE
@@ -94,6 +95,7 @@ if(ANDROID)
         nk_session
         nk_sensing
         nk_options
+        android
         log
     )
 endif()

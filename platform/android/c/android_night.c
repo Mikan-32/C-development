@@ -1,32 +1,27 @@
 #include "android_night.h"
 
+#include "android_accel.h"
 #include "android_bridge.h"
 
 #include <SDL3/SDL_system.h>
 #include <android/log.h>
 
 static const SDL_FRect start_button = {20.0f, 300.0f, 150.0f, 50.0f};
-
 static const SDL_FRect stop_button = {190.0f, 300.0f, 150.0f, 50.0f};
-
-static const char *action_status = "Tap START to test night service";
-
+static const char *action_status = "Tap START to check accelerometer";
 static bool start_requested;
 
 static void SDLCALL notification_permission_result(void *userdata, const char *permission,
                                                    bool granted) {
     (void)userdata;
-
     (void)__android_log_print(ANDROID_LOG_INFO, "NkAndroid", "Permission result: %s granted=%d",
                               permission, granted ? 1 : 0);
-
-    /* 許可されたことだけではサービスを開始しない。 */
+    /* A permission result never starts the service automatically. */
 }
 
 void nk_android_night_ui_init(void) {
-    action_status = "Tap START to test night service";
+    action_status = "Tap START to check accelerometer";
     start_requested = false;
-
     (void)SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
 }
 
@@ -38,27 +33,20 @@ static nk_result request_start(nk_data *data) {
     if (data == NULL) {
         return NK_ERROR_ARGUMENT;
     }
-
     result = nk_data_has_measurement_consent(data, &has_consent);
-
     if (result != NK_OK) {
         return result;
     }
-
     if (!has_consent) {
         return NK_ERROR_CONSENT_REQUIRED;
     }
-
     if (nk_android_bridge_night_state() == NK_ANDROID_NIGHT_STARTED) {
         return NK_ERROR_ALREADY_RUNNING;
     }
-
     result = nk_android_bridge_notifications_allowed(&notifications_allowed);
-
     if (result != NK_OK) {
         return result;
     }
-
     if (!notifications_allowed) {
         if (SDL_GetAndroidSDKVersion() >= 33) {
             if (!SDL_RequestAndroidPermission("android.permission.POST_NOTIFICATIONS",
@@ -66,17 +54,18 @@ static nk_result request_start(nk_data *data) {
                 return NK_ERROR_IO;
             }
         }
-
         return NK_ERROR_PERMISSION_REQUIRED;
     }
-
-    result = nk_android_bridge_night_start(0, "ねむのき",
-                                           "夜間サービスの動作確認中（センサー計測は未開始）");
-
+    result = nk_android_accel_prepare();
+    if (result != NK_OK) {
+        return result;
+    }
+    result = nk_android_bridge_night_start(0, "ねむのき", "加速度の取得確認中（DB保存は未接続）");
     if (result == NK_OK) {
         start_requested = true;
+    } else {
+        nk_android_accel_request_stop();
     }
-
     return result;
 }
 
@@ -92,20 +81,15 @@ nk_result nk_android_night_ui_event(nk_data *data, SDL_Renderer *renderer, const
     if (renderer == NULL || input == NULL) {
         return NK_ERROR_ARGUMENT;
     }
-
     if (input->type != SDL_EVENT_MOUSE_BUTTON_UP || input->button.button != SDL_BUTTON_LEFT) {
         return NK_OK;
     }
-
     event = *input;
-
     if (!SDL_ConvertEventToRenderCoordinates(renderer, &event)) {
         return NK_ERROR_IO;
     }
-
     if (contains(&start_button, event.button.x, event.button.y)) {
         result = request_start(data);
-
         switch (result) {
         case NK_OK:
             action_status = "Start requested";
@@ -117,7 +101,7 @@ nk_result nk_android_night_ui_event(nk_data *data, SDL_Renderer *renderer, const
             action_status = "Allow notifications; tap START again";
             break;
         case NK_ERROR_ALREADY_RUNNING:
-            action_status = "Service already running";
+            action_status = "Starting or already running";
             break;
         case NK_ERROR_ARGUMENT:
             action_status = "Database is unavailable";
@@ -128,15 +112,12 @@ nk_result nk_android_night_ui_event(nk_data *data, SDL_Renderer *renderer, const
         }
     } else if (contains(&stop_button, event.button.x, event.button.y)) {
         result = nk_android_bridge_night_stop();
-
         action_status = result == NK_OK ? "Stop requested" : "Stop failed; check log";
     } else {
         return NK_OK;
     }
-
     (void)__android_log_print(ANDROID_LOG_INFO, "NkAndroid", "Night service action result: %d",
                               (int)result);
-
     return result;
 }
 
@@ -149,11 +130,9 @@ static bool draw_button(SDL_Renderer *renderer, const SDL_FRect *button, const c
 
 nk_result nk_android_night_ui_draw(SDL_Renderer *renderer) {
     const char *state_text;
-
     if (renderer == NULL) {
         return NK_ERROR_ARGUMENT;
     }
-
     switch (nk_android_bridge_night_state()) {
     case NK_ANDROID_NIGHT_STARTED:
         state_text = "Night service: running";
@@ -165,24 +144,24 @@ nk_result nk_android_night_ui_draw(SDL_Renderer *renderer) {
         state_text = "Night service: failed";
         break;
     }
-
     if (!SDL_SetRenderDrawColor(renderer, 235, 240, 245, 255) ||
         !SDL_RenderDebugText(renderer, 20.0f, 240.0f, state_text) ||
         !draw_button(renderer, &start_button, "START service") ||
         !draw_button(renderer, &stop_button, "STOP service") ||
-        !SDL_RenderDebugText(renderer, 20.0f, 380.0f, action_status)) {
+        !SDL_RenderDebugText(renderer, 20.0f, 380.0f, action_status) ||
+        !SDL_RenderDebugText(renderer, 20.0f, 420.0f, nk_android_accel_status())) {
         return NK_ERROR_IO;
     }
-
     return NK_OK;
 }
 
 nk_result nk_android_night_ui_shutdown(void) {
+    nk_result accel_result = nk_android_accel_shutdown();
+    nk_result service_result = NK_OK;
     if (start_requested || nk_android_bridge_night_state() == NK_ANDROID_NIGHT_STARTED) {
-        return nk_android_bridge_night_stop();
+        service_result = nk_android_bridge_night_stop();
     }
-
-    return NK_OK;
+    return accel_result != NK_OK ? accel_result : service_result;
 }
 
 /* END NK_ANDROID_NIGHT_C */
