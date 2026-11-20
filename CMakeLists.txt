@@ -67,6 +67,34 @@ add_subdirectory(src/data)
 add_subdirectory(src/sensing)
 add_subdirectory(src/session)
 
+# Androidアプリの起動用ライブラリ
+if(ANDROID)
+    set(SDL_SHARED ON CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+    set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+
+    add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
+
+    # Android Studioの同期時に、生成前のPCHを参照しないようにする
+    set_property(TARGET SDL3-shared PROPERTY
+        DISABLE_PRECOMPILE_HEADERS ON
+    )
+
+    add_library(main SHARED
+        platform/android/c/android_main.c
+    )
+
+    target_link_libraries(main PRIVATE
+        SDL3::SDL3
+        nk_data
+        nk_session
+        nk_sensing
+        nk_options
+        log
+    )
+endif()
+
 # ------------------------------------------------------------------
 # テスト（PC 版のみ）
 # ------------------------------------------------------------------
