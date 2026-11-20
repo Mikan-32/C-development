@@ -87,6 +87,7 @@ if(ANDROID)
         platform/android/c/android_consent.c
         platform/android/c/android_night.c
         platform/android/c/android_accel.c
+        platform/android/c/android_recording.c
     )
 
     target_link_libraries(main PRIVATE
@@ -239,21 +240,19 @@ if(NK_BUILD_TESTS AND NOT ANDROID)
         )
     endif() # NK_ENABLE_LOCAL_WAV_TESTS
 
-    if(NK_BUILD_TESTS AND NOT ANDROID)
-        add_executable(nk_accel_features_check
-            tests/unit/accel_features_check.c
-        )
+    add_executable(nk_accel_features_check
+        tests/unit/accel_features_check.c
+    )
 
-        target_link_libraries(nk_accel_features_check PRIVATE
-            nk_unity
-            nk_sensing
-            nk_options
-        )
+    target_link_libraries(nk_accel_features_check PRIVATE
+        nk_unity
+        nk_sensing
+        nk_options
+    )
 
-        add_test(
-            NAME accel_features
-            COMMAND nk_accel_features_check
-        )
-        endif()
+    add_test(
+        NAME accel_features
+        COMMAND nk_accel_features_check
+    )
 
 endif() # NK_BUILD_TESTS AND NOT ANDROID

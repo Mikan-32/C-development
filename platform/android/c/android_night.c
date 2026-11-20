@@ -8,7 +8,7 @@
 
 static const SDL_FRect start_button = {20.0f, 300.0f, 150.0f, 50.0f};
 static const SDL_FRect stop_button = {190.0f, 300.0f, 150.0f, 50.0f};
-static const char *action_status = "Tap START to check accelerometer";
+static const char *action_status = "Tap START to record accelerometer";
 static bool start_requested;
 
 static void SDLCALL notification_permission_result(void *userdata, const char *permission,
@@ -20,7 +20,7 @@ static void SDLCALL notification_permission_result(void *userdata, const char *p
 }
 
 void nk_android_night_ui_init(void) {
-    action_status = "Tap START to check accelerometer";
+    action_status = "Tap START to record accelerometer";
     start_requested = false;
     (void)SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
 }
@@ -60,7 +60,8 @@ static nk_result request_start(nk_data *data) {
     if (result != NK_OK) {
         return result;
     }
-    result = nk_android_bridge_night_start(0, "ねむのき", "加速度の取得確認中（DB保存は未接続）");
+    result =
+        nk_android_bridge_night_start(0, "ねむのき", "加速度の計測と暗号化保存中（マイクなし）");
     if (result == NK_OK) {
         start_requested = true;
     } else {

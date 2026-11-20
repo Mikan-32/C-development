@@ -208,7 +208,16 @@ cleanup:
 }
 
 nk_result nk_android_bridge_night_stop(void) {
-    nk_android_accel_request_stop();
+    nk_android_accel_request_user_stop();
+    if (nk_android_accel_is_active()) {
+        (void)__android_log_print(ANDROID_LOG_INFO, NK_BRIDGE_TAG,
+                                  "Night service stop deferred until DB flush");
+        return NK_OK;
+    }
+    return nk_android_bridge_night_stop_now();
+}
+
+nk_result nk_android_bridge_night_stop_now(void) {
     JNIEnv *env = current_env();
 
     if (env == NULL) {

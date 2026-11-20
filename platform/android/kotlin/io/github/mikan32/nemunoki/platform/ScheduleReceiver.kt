@@ -40,9 +40,9 @@ class ScheduleReceiver : BroadcastReceiver() {
                 Notifications.cancel(context, Notifications.noticeId(id))
         }
         runInBackground {
+            // C requests a stop, flushes the recording, then stops NightService.
+            // Returning from this callback does not mean the recording is saved.
             NativeBridge.onNotificationAction(action, id)
-            // 計測の停止は C が記録を締めてから行う。C が止めなかった場合に備えて、最後に止めておく
-            if (action == NativeBridge.ACT_STOP_TRACKING) NightService.stop(context)
         }
     }
 
