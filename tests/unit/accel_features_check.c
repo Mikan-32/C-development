@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#define NS INT64_C(1000000000)
+#define NK_TEST_SECOND_NS INT64_C(1000000000)
 
 static nk_accel_features *features;
 static nk_sensing *pipeline;
@@ -64,7 +64,8 @@ static void create_features(int64_t start_ns) {
 
 static void push_stationary_second(int second, int samples) {
     for (int i = 0; i < samples; ++i) {
-        int64_t timestamp = (int64_t)second * NS + (int64_t)i * NS / samples;
+        int64_t timestamp =
+            (int64_t)second * NK_TEST_SECOND_NS + (int64_t)i * NK_TEST_SECOND_NS / samples;
         TEST_ASSERT_EQUAL_INT(NK_OK,
                               nk_accel_features_push(features, timestamp, 0.0f, 0.0f, 9.80665f));
     }
@@ -74,7 +75,7 @@ static void test_stationary_gravity_and_real_sample_counts(void) {
     create_features(0);
     push_stationary_second(0, 53);
     push_stationary_second(1, 52);
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 2 * NS));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 2 * NK_TEST_SECOND_NS));
     TEST_ASSERT_EQUAL_INT(2, second_count);
     TEST_ASSERT_EQUAL_INT(53, seconds[0].acc_sample_count);
     TEST_ASSERT_EQUAL_INT(52, seconds[1].acc_sample_count);
@@ -93,7 +94,7 @@ static void test_half_second_mean_is_removed_and_converted_to_mg(void) {
         TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_push(features, i * INT64_C(20000000),
                                                             i >= 25 ? 1.0f : 0.0f, 0.0f, 9.80665f));
     }
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, NS));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, NK_TEST_SECOND_NS));
     /* In the second half, the 25-sample mean goes from 1/25 to 25/25. */
     TEST_ASSERT_TRUE(fabs(seconds[0].acc_hp.value - 0.48 * 1000.0 / 9.80665) < 1.0e-8);
     TEST_ASSERT_TRUE(seconds[0].acc_hp.value > 15.0);
@@ -106,8 +107,10 @@ static void test_half_second_mean_is_removed_and_converted_to_mg(void) {
 static void test_gap_seconds_are_missing_and_gravity_rewarms(void) {
     create_features(0);
     push_stationary_second(0, 50);
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_push(features, 3 * NS, 0, 0, 9.80665f));
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 3 * NS + NS / 10));
+    TEST_ASSERT_EQUAL_INT(NK_OK,
+                          nk_accel_features_push(features, 3 * NK_TEST_SECOND_NS, 0, 0, 9.80665f));
+    TEST_ASSERT_EQUAL_INT(
+        NK_OK, nk_accel_features_finish(features, 3 * NK_TEST_SECOND_NS + NK_TEST_SECOND_NS / 10));
     TEST_ASSERT_EQUAL_INT(4, second_count);
     for (int i = 1; i <= 2; ++i) {
         TEST_ASSERT_EQUAL_INT(i, seconds[i].idx);
@@ -125,25 +128,27 @@ static void test_partial_second_is_not_padded_and_finish_is_idempotent(void) {
         TEST_ASSERT_EQUAL_INT(
             NK_OK, nk_accel_features_push(features, i * INT64_C(20000000), 0, 0, 9.80665f));
     }
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 3 * NS / 10));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 3 * NK_TEST_SECOND_NS / 10));
     TEST_ASSERT_EQUAL_INT(1, second_count);
     TEST_ASSERT_EQUAL_INT(15, seconds[0].acc_sample_count);
     TEST_ASSERT_EQUAL_INT(0, seconds[0].acc_hp.has_value);
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 3 * NS / 10));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 3 * NK_TEST_SECOND_NS / 10));
     TEST_ASSERT_EQUAL_INT(1, second_count);
     TEST_ASSERT_EQUAL_INT(NK_ERROR_NOT_RUNNING,
-                          nk_accel_features_push(features, NS, 0, 0, 9.80665f));
+                          nk_accel_features_push(features, NK_TEST_SECOND_NS, 0, 0, 9.80665f));
 }
 
 static void test_watermark_emits_missing_seconds_and_rejects_late_samples(void) {
     create_features(0);
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_advance(features, 2 * NS));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_advance(features, 2 * NK_TEST_SECOND_NS));
     TEST_ASSERT_EQUAL_INT(2, second_count);
     TEST_ASSERT_EQUAL_INT(0, seconds[0].acc_sample_count);
     TEST_ASSERT_EQUAL_INT(0, seconds[1].acc_hp.has_value);
-    TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT, nk_accel_features_push(features, NS, 0, 0, 9.80665f));
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_push(features, 2 * NS, 0, 0, 9.80665f));
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 3 * NS));
+    TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT,
+                          nk_accel_features_push(features, NK_TEST_SECOND_NS, 0, 0, 9.80665f));
+    TEST_ASSERT_EQUAL_INT(NK_OK,
+                          nk_accel_features_push(features, 2 * NK_TEST_SECOND_NS, 0, 0, 9.80665f));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 3 * NK_TEST_SECOND_NS));
     TEST_ASSERT_EQUAL_INT(3, second_count);
     TEST_ASSERT_EQUAL_INT(1, seconds[2].acc_sample_count);
 }
@@ -151,22 +156,27 @@ static void test_watermark_emits_missing_seconds_and_rejects_late_samples(void) 
 static void test_callback_failure_is_terminal(void) {
     create_features(0);
     reject_output = 1;
-    TEST_ASSERT_EQUAL_INT(NK_ERROR_DATABASE, nk_accel_features_advance(features, NS));
-    reject_output = 0;
-    TEST_ASSERT_EQUAL_INT(NK_ERROR_DATABASE, nk_accel_features_finish(features, NS));
     TEST_ASSERT_EQUAL_INT(NK_ERROR_DATABASE,
-                          nk_accel_features_push(features, 2 * NS, 0, 0, 9.80665f));
+                          nk_accel_features_advance(features, NK_TEST_SECOND_NS));
+    reject_output = 0;
+    TEST_ASSERT_EQUAL_INT(NK_ERROR_DATABASE, nk_accel_features_finish(features, NK_TEST_SECOND_NS));
+    TEST_ASSERT_EQUAL_INT(NK_ERROR_DATABASE,
+                          nk_accel_features_push(features, 2 * NK_TEST_SECOND_NS, 0, 0, 9.80665f));
     TEST_ASSERT_EQUAL_INT(0, second_count);
 }
 
 static void test_invalid_input_does_not_count_as_a_sample(void) {
-    create_features(NS);
+    create_features(NK_TEST_SECOND_NS);
     TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT, nk_accel_features_push(features, 0, 0, 0, 0));
-    TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT, nk_accel_features_push(features, NS, NAN, 0, 0));
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_push(features, NS, 0, 0, 9.80665f));
-    TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT, nk_accel_features_push(features, NS, 0, 0, 9.80665f));
-    TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT, nk_accel_features_finish(features, NS));
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, NS + NS / 2));
+    TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT,
+                          nk_accel_features_push(features, NK_TEST_SECOND_NS, NAN, 0, 0));
+    TEST_ASSERT_EQUAL_INT(NK_OK,
+                          nk_accel_features_push(features, NK_TEST_SECOND_NS, 0, 0, 9.80665f));
+    TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT,
+                          nk_accel_features_push(features, NK_TEST_SECOND_NS, 0, 0, 9.80665f));
+    TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT, nk_accel_features_finish(features, NK_TEST_SECOND_NS));
+    TEST_ASSERT_EQUAL_INT(
+        NK_OK, nk_accel_features_finish(features, NK_TEST_SECOND_NS + NK_TEST_SECOND_NS / 2));
     TEST_ASSERT_EQUAL_INT(1, seconds[0].acc_sample_count);
 }
 
@@ -176,7 +186,7 @@ static void test_zero_gravity_has_no_invented_direction(void) {
         TEST_ASSERT_EQUAL_INT(NK_OK,
                               nk_accel_features_push(features, i * INT64_C(20000000), 0, 0, 0));
     }
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, NS));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, NK_TEST_SECOND_NS));
     TEST_ASSERT_EQUAL_INT(1, seconds[0].acc_hp.has_value);
     TEST_ASSERT_TRUE(fabs(seconds[0].acc_hp.value) < 1.0e-9);
     TEST_ASSERT_EQUAL_INT(0, seconds[0].gravity.has_value);
@@ -190,7 +200,7 @@ static void test_53_hz_input_connects_to_existing_epoch_aggregation(void) {
     for (int i = 0; i < 30; ++i) {
         push_stationary_second(i, 53);
     }
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 30 * NS));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_accel_features_finish(features, 30 * NK_TEST_SECOND_NS));
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_sensing_finish(pipeline));
     TEST_ASSERT_EQUAL_INT(30, second_count);
     TEST_ASSERT_EQUAL_INT(1, epoch_count);
@@ -209,7 +219,7 @@ static void test_empty_session_and_limits(void) {
     TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT,
                           nk_accel_features_create(&features, INT64_MAX, on_second, NULL));
     create_features(0);
-    int64_t max_ns = (int64_t)NK_SENSING_MAX_EPOCHS * NK_SENSING_EPOCH_SECONDS * NS;
+    int64_t max_ns = (int64_t)NK_SENSING_MAX_EPOCHS * NK_SENSING_EPOCH_SECONDS * NK_TEST_SECOND_NS;
     TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT,
                           nk_accel_features_push(features, max_ns, 0, 0, 9.80665f));
     TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT, nk_accel_features_advance(features, max_ns + 1));

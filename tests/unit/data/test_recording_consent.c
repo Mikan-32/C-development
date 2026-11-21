@@ -15,7 +15,7 @@
 static unsigned char key[NK_ANDROID_DB_KEY_SIZE];
 static nk_android_recording *recording;
 static int saw_summary;
-#define START_MS INT64_C(1794326400000)
+#define NK_TEST_START_MS INT64_C(1794326400000)
 
 void setUp(void);
 void tearDown(void);
@@ -114,7 +114,7 @@ void tearDown(void) {
 
 static void start_and_collect(void) {
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_android_recording_open(&recording));
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_android_recording_start(recording, START_MS));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_android_recording_start(recording, NK_TEST_START_MS));
     for (int i = 0; i < 45; ++i) {
         nk_sensing_second second = {0};
         second.idx = i;
@@ -128,8 +128,8 @@ static void test_revocation_allows_flush_and_records_its_reason(void) {
     start_and_collect();
     TEST_ASSERT_TRUE(nk_data_consent_set_agreed(false, 0));
     TEST_ASSERT_EQUAL_INT(NK_ERROR_CONSENT_REQUIRED, nk_android_recording_check_consent(recording));
-    TEST_ASSERT_EQUAL_INT(
-        NK_OK, nk_android_recording_finish(recording, START_MS + 45000, NK_SESSION_END_USER_STOP));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_android_recording_finish(recording, NK_TEST_START_MS + 45000,
+                                                             NK_SESSION_END_USER_STOP));
     TEST_ASSERT_EQUAL_INT(1, saw_summary);
     sqlite3_stmt *statement = NULL;
     TEST_ASSERT_EQUAL_INT(
@@ -154,8 +154,8 @@ static void test_version_change_blocks_worker_before_start(void) {
 static void test_normal_stop_keeps_the_user_stop_reason(void) {
     start_and_collect();
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_android_recording_check_consent(recording));
-    TEST_ASSERT_EQUAL_INT(
-        NK_OK, nk_android_recording_finish(recording, START_MS + 45000, NK_SESSION_END_USER_STOP));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_android_recording_finish(recording, NK_TEST_START_MS + 45000,
+                                                             NK_SESSION_END_USER_STOP));
     TEST_ASSERT_EQUAL_INT(1, saw_summary);
 }
 
@@ -166,7 +166,7 @@ static void test_consent_read_failure_is_reported_after_saving_error_end(void) {
     TEST_ASSERT_EQUAL_INT(NK_ERROR_DATABASE, nk_android_recording_check_consent(recording));
     TEST_ASSERT_EQUAL_INT(
         NK_ERROR_DATABASE,
-        nk_android_recording_finish(recording, START_MS + 45000, NK_SESSION_END_USER_STOP));
+        nk_android_recording_finish(recording, NK_TEST_START_MS + 45000, NK_SESSION_END_USER_STOP));
     sqlite3_stmt *statement = NULL;
     TEST_ASSERT_EQUAL_INT(SQLITE_OK,
                           sqlite3_prepare_v2(nk_db_get_handle(), "SELECT end_reason FROM session;",

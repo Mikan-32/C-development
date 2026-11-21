@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#define TEST_DB "nk_data_recovery_test.db"
-#define BASE_MS INT64_C(1794326400000)
+#define TEST_DB         "nk_data_recovery_test.db"
+#define NK_TEST_BASE_MS INT64_C(1794326400000)
 
 static const unsigned char test_key[] = "0123456789abcdef0123456789abcdef";
 static nk_data *data;
@@ -117,16 +117,16 @@ static nk_data_recovery_report recover(int64_t at_ms) {
 }
 
 static void test_interruption_preserves_data_and_adds_null_epochs(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.98);
     seed_epoch(id, 1, 0.99);
-    nk_data_recovery_report report = recover(BASE_MS + 150000);
+    nk_data_recovery_report report = recover(NK_TEST_BASE_MS + 150000);
     TEST_ASSERT_EQUAL_INT(1, report.recovered_sessions);
     TEST_ASSERT_EQUAL_INT(1, report.interrupted_sessions);
     TEST_ASSERT_EQUAL_INT(1, report.q04_sessions);
     TEST_ASSERT_EQUAL_INT(3, report.added_epochs);
-    TEST_ASSERT_TRUE(report.gap_start_ms == BASE_MS + 60000);
-    TEST_ASSERT_TRUE(report.gap_end_ms == BASE_MS + 150000);
+    TEST_ASSERT_TRUE(report.gap_start_ms == NK_TEST_BASE_MS + 60000);
+    TEST_ASSERT_TRUE(report.gap_end_ms == NK_TEST_BASE_MS + 150000);
     TEST_ASSERT_EQUAL_INT(5, scalar("SELECT COUNT(*) FROM epoch WHERE session_id=?1", id));
     TEST_ASSERT_EQUAL_INT(2, scalar("SELECT COUNT(*) FROM epoch WHERE session_id=?1 AND idx<2 "
                                     "AND move_mg=1.25 AND acc_cov>=0.98",
@@ -154,31 +154,33 @@ static void test_interruption_preserves_data_and_adds_null_epochs(void) {
 }
 
 static void test_reopen_is_idempotent_and_notice_persists(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
-    (void)recover(BASE_MS + 120000);
+    (void)recover(NK_TEST_BASE_MS + 120000);
     TEST_ASSERT_EQUAL_INT(SQLITE_OK, sqlite3_close(probe));
     probe = NULL;
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_close(data));
     data = NULL;
     open_handles();
-    nk_data_recovery_report report = recover(BASE_MS + 300000);
+    nk_data_recovery_report report = recover(NK_TEST_BASE_MS + 300000);
     TEST_ASSERT_EQUAL_INT(0, report.recovered_sessions);
     TEST_ASSERT_EQUAL_INT(0, report.added_epochs);
     TEST_ASSERT_EQUAL_INT(1, report.has_interruption);
     TEST_ASSERT_TRUE(report.interrupted_session_id == id);
-    TEST_ASSERT_TRUE(report.gap_end_ms == BASE_MS + 120000);
+    TEST_ASSERT_TRUE(report.gap_end_ms == NK_TEST_BASE_MS + 120000);
     TEST_ASSERT_EQUAL_INT(4, scalar("SELECT COUNT(*) FROM epoch WHERE session_id=?1", id));
     TEST_ASSERT_EQUAL_INT(2, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1", id));
-    TEST_ASSERT_TRUE(scalar("SELECT end_ms FROM session WHERE id=?1", id) == BASE_MS + 120000);
+    TEST_ASSERT_TRUE(scalar("SELECT end_ms FROM session WHERE id=?1", id) ==
+                     NK_TEST_BASE_MS + 120000);
 }
 
 static void test_finished_sessions_are_unchanged(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_session_finish(data, id, BASE_MS + 30000, "2026-11-11",
-                                                        NK_SESSION_END_USER_STOP, 1, 84));
-    nk_data_recovery_report report = recover(BASE_MS + 300000);
+    TEST_ASSERT_EQUAL_INT(NK_OK,
+                          nk_data_session_finish(data, id, NK_TEST_BASE_MS + 30000, "2026-11-11",
+                                                 NK_SESSION_END_USER_STOP, 1, 84));
+    nk_data_recovery_report report = recover(NK_TEST_BASE_MS + 300000);
     TEST_ASSERT_EQUAL_INT(0, report.recovered_sessions);
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT COUNT(*) FROM epoch WHERE session_id=?1", id));
     TEST_ASSERT_EQUAL_INT(0, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1", id));
@@ -188,30 +190,30 @@ static void test_finished_sessions_are_unchanged(void) {
 }
 
 static void test_gap_shorter_than_one_minute_does_not_create_q04(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
-    nk_data_recovery_report report = recover(BASE_MS + 89999);
+    nk_data_recovery_report report = recover(NK_TEST_BASE_MS + 89999);
     TEST_ASSERT_EQUAL_INT(1, report.interrupted_sessions);
     TEST_ASSERT_EQUAL_INT(0, report.q04_sessions);
     TEST_ASSERT_EQUAL_INT(0, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1", id));
 }
 
 static void test_exactly_one_minute_creates_q04(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
-    nk_data_recovery_report report = recover(BASE_MS + 90000);
+    nk_data_recovery_report report = recover(NK_TEST_BASE_MS + 90000);
     TEST_ASSERT_EQUAL_INT(1, report.q04_sessions);
     TEST_ASSERT_EQUAL_INT(
         60000, scalar("SELECT dur_ms FROM event WHERE session_id=?1 AND type='GAP_END'", id));
 }
 
 static void test_open_q04_is_closed_without_a_duplicate_start(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
     seed_epoch(id, 1, 0.0);
     seed_epoch(id, 2, 0.0);
-    seed_event(id, NK_EVENT_GAP_START, BASE_MS + 30000, 0, "Q04");
-    nk_data_recovery_report report = recover(BASE_MS + 150000);
+    seed_event(id, NK_EVENT_GAP_START, NK_TEST_BASE_MS + 30000, 0, "Q04");
+    nk_data_recovery_report report = recover(NK_TEST_BASE_MS + 150000);
     TEST_ASSERT_EQUAL_INT(2, report.added_epochs);
     TEST_ASSERT_EQUAL_INT(
         1, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1 AND type='GAP_START'", id));
@@ -220,21 +222,21 @@ static void test_open_q04_is_closed_without_a_duplicate_start(void) {
 }
 
 static void test_trailing_missing_epochs_without_a_marker_are_included(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
     seed_epoch(id, 1, 0.0);
     seed_epoch(id, 2, 0.0);
-    nk_data_recovery_report report = recover(BASE_MS + 150000);
-    TEST_ASSERT_TRUE(report.gap_start_ms == BASE_MS + 30000);
+    nk_data_recovery_report report = recover(NK_TEST_BASE_MS + 150000);
+    TEST_ASSERT_TRUE(report.gap_start_ms == NK_TEST_BASE_MS + 30000);
     TEST_ASSERT_EQUAL_INT(2, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1", id));
 }
 
 static void test_open_microphone_gap_is_closed_before_process_gap(void) {
-    int64_t id = seed_session(BASE_MS, 540, 1);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 1);
     seed_epoch(id, 0, 0.99);
     seed_epoch(id, 1, 0.99);
-    seed_event(id, NK_EVENT_GAP_START, BASE_MS, 0, "Q08");
-    (void)recover(BASE_MS + 150000);
+    seed_event(id, NK_EVENT_GAP_START, NK_TEST_BASE_MS, 0, "Q08");
+    (void)recover(NK_TEST_BASE_MS + 150000);
     TEST_ASSERT_EQUAL_INT(60000, scalar("SELECT dur_ms FROM event WHERE session_id=?1 "
                                         "AND type='GAP_END' AND reason='Q08'",
                                         id));
@@ -244,50 +246,52 @@ static void test_open_microphone_gap_is_closed_before_process_gap(void) {
 }
 
 static void test_persisted_user_stop_does_not_become_a_crash_gap(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
     seed_epoch(id, 1, 0.5);
-    seed_event(id, NK_EVENT_USER, BASE_MS + 45000, 0, "USER_STOP");
-    nk_data_recovery_report report = recover(BASE_MS + 300000);
+    seed_event(id, NK_EVENT_USER, NK_TEST_BASE_MS + 45000, 0, "USER_STOP");
+    nk_data_recovery_report report = recover(NK_TEST_BASE_MS + 300000);
     TEST_ASSERT_EQUAL_INT(1, report.completed_user_stops);
     TEST_ASSERT_EQUAL_INT(0, report.interrupted_sessions);
     TEST_ASSERT_EQUAL_INT(0, report.added_epochs);
-    TEST_ASSERT_TRUE(scalar("SELECT end_ms FROM session WHERE id=?1", id) == BASE_MS + 45000);
+    TEST_ASSERT_TRUE(scalar("SELECT end_ms FROM session WHERE id=?1", id) ==
+                     NK_TEST_BASE_MS + 45000);
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT end_reason='USER_STOP' FROM session WHERE id=?1", id));
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1", id));
 }
 
 static void test_persisted_consent_revoke_does_not_become_a_crash_gap(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
     seed_epoch(id, 1, 0.5);
-    seed_event(id, NK_EVENT_USER, BASE_MS + 45000, 0, "CONSENT_REVOKED");
-    nk_data_recovery_report report = recover(BASE_MS + 300000);
+    seed_event(id, NK_EVENT_USER, NK_TEST_BASE_MS + 45000, 0, "CONSENT_REVOKED");
+    nk_data_recovery_report report = recover(NK_TEST_BASE_MS + 300000);
     TEST_ASSERT_EQUAL_INT(1, report.completed_user_stops);
     TEST_ASSERT_EQUAL_INT(0, report.interrupted_sessions);
     TEST_ASSERT_EQUAL_INT(0, report.added_epochs);
-    TEST_ASSERT_TRUE(scalar("SELECT end_ms FROM session WHERE id=?1", id) == BASE_MS + 45000);
+    TEST_ASSERT_TRUE(scalar("SELECT end_ms FROM session WHERE id=?1", id) ==
+                     NK_TEST_BASE_MS + 45000);
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT end_reason='USER_STOP' FROM session WHERE id=?1", id));
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1", id));
 }
 
 static void test_recovery_is_capped_at_fourteen_hours(void) {
-    int64_t id = seed_session(BASE_MS, -480, 0);
-    (void)recover(BASE_MS + INT64_C(86400000));
+    int64_t id = seed_session(NK_TEST_BASE_MS, -480, 0);
+    (void)recover(NK_TEST_BASE_MS + INT64_C(86400000));
     TEST_ASSERT_EQUAL_INT(1680, scalar("SELECT COUNT(*) FROM epoch WHERE session_id=?1", id));
     TEST_ASSERT_TRUE(scalar("SELECT end_ms FROM session WHERE id=?1", id) ==
-                     BASE_MS + INT64_C(50400000));
+                     NK_TEST_BASE_MS + INT64_C(50400000));
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT night_date=date(end_ms/1000+tz_min*60,'unixepoch') "
                                     "FROM session WHERE id=?1",
                                     id));
 }
 
 static void test_multiple_sessions_are_recovered_in_one_transaction(void) {
-    int64_t first = seed_session(BASE_MS - 120000, 540, 0);
-    int64_t second = seed_session(BASE_MS, 540, 0);
+    int64_t first = seed_session(NK_TEST_BASE_MS - 120000, 540, 0);
+    int64_t second = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(first, 0, 0.99);
     seed_epoch(second, 0, 0.99);
-    nk_data_recovery_report report = recover(BASE_MS + 150000);
+    nk_data_recovery_report report = recover(NK_TEST_BASE_MS + 150000);
     TEST_ASSERT_EQUAL_INT(2, report.recovered_sessions);
     TEST_ASSERT_EQUAL_INT(2, report.q04_sessions);
     TEST_ASSERT_EQUAL_INT(12, report.added_epochs);
@@ -296,8 +300,8 @@ static void test_multiple_sessions_are_recovered_in_one_transaction(void) {
 }
 
 static void test_failure_rolls_back_other_recovered_sessions_too(void) {
-    int64_t first = seed_session(BASE_MS - 120000, 540, 0);
-    int64_t second = seed_session(BASE_MS, 540, 0);
+    int64_t first = seed_session(NK_TEST_BASE_MS - 120000, 540, 0);
+    int64_t second = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(first, 0, 0.99);
     seed_epoch(second, 0, 0.99);
     execute_probe(
@@ -305,19 +309,19 @@ static void test_failure_rolls_back_other_recovered_sessions_too(void) {
         "WHEN NEW.session_id=2 AND NEW.idx=2 BEGIN SELECT RAISE(ABORT,'recovery blocked'); END;");
     nk_data_recovery_report report = {0};
     TEST_ASSERT_EQUAL_INT(NK_ERROR_DATABASE,
-                          nk_data_recover_unfinished(data, BASE_MS + 150000, &report));
+                          nk_data_recover_unfinished(data, NK_TEST_BASE_MS + 150000, &report));
     TEST_ASSERT_NOT_NULL(strstr(nk_data_last_error(data), "recovery blocked"));
     TEST_ASSERT_EQUAL_INT(0, report.recovered_sessions);
     TEST_ASSERT_EQUAL_INT(2, scalar("SELECT COUNT(*) FROM session WHERE end_ms IS NULL", 0));
     TEST_ASSERT_EQUAL_INT(2, scalar("SELECT COUNT(*) FROM epoch", 0));
     TEST_ASSERT_EQUAL_INT(0, scalar("SELECT COUNT(*) FROM event", 0));
     execute_probe("DROP TRIGGER block_recovery;");
-    report = recover(BASE_MS + 150000);
+    report = recover(NK_TEST_BASE_MS + 150000);
     TEST_ASSERT_EQUAL_INT(2, report.recovered_sessions);
 }
 
 static void test_commit_failure_rolls_back_and_allows_retry(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
     execute_probe("CREATE TABLE recovery_commit_guard(sid INTEGER REFERENCES session(id) "
                   "DEFERRABLE INITIALLY DEFERRED);"
@@ -325,45 +329,46 @@ static void test_commit_failure_rolls_back_and_allows_retry(void) {
                   "BEGIN INSERT INTO recovery_commit_guard VALUES(-999); END;");
     nk_data_recovery_report report = {0};
     TEST_ASSERT_EQUAL_INT(NK_ERROR_DATABASE,
-                          nk_data_recover_unfinished(data, BASE_MS + 120000, &report));
+                          nk_data_recover_unfinished(data, NK_TEST_BASE_MS + 120000, &report));
     TEST_ASSERT_EQUAL_INT(0, report.recovered_sessions);
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT end_ms IS NULL FROM session WHERE id=?1", id));
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT COUNT(*) FROM epoch WHERE session_id=?1", id));
     TEST_ASSERT_EQUAL_INT(0, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1", id));
     execute_probe("DROP TRIGGER block_commit; DROP TABLE recovery_commit_guard;");
-    report = recover(BASE_MS + 120000);
+    report = recover(NK_TEST_BASE_MS + 120000);
     TEST_ASSERT_EQUAL_INT(1, report.recovered_sessions);
 }
 
 static void test_clock_before_session_start_preserves_records(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
     nk_data_recovery_report report = {0};
-    TEST_ASSERT_EQUAL_INT(NK_ERROR_FORMAT, nk_data_recover_unfinished(data, BASE_MS - 1, &report));
+    TEST_ASSERT_EQUAL_INT(NK_ERROR_FORMAT,
+                          nk_data_recover_unfinished(data, NK_TEST_BASE_MS - 1, &report));
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT end_ms IS NULL FROM session WHERE id=?1", id));
     TEST_ASSERT_EQUAL_INT(0, report.recovered_sessions);
 }
 
 static void test_unbalanced_markers_are_preserved_for_diagnosis(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
-    seed_event(id, NK_EVENT_GAP_START, BASE_MS, 0, "Q04");
-    seed_event(id, NK_EVENT_GAP_START, BASE_MS + 1000, 0, "Q04");
+    seed_event(id, NK_EVENT_GAP_START, NK_TEST_BASE_MS, 0, "Q04");
+    seed_event(id, NK_EVENT_GAP_START, NK_TEST_BASE_MS + 1000, 0, "Q04");
     nk_data_recovery_report report = {0};
     TEST_ASSERT_EQUAL_INT(NK_ERROR_FORMAT,
-                          nk_data_recover_unfinished(data, BASE_MS + 120000, &report));
+                          nk_data_recover_unfinished(data, NK_TEST_BASE_MS + 120000, &report));
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT COUNT(*) FROM epoch WHERE session_id=?1", id));
     TEST_ASSERT_EQUAL_INT(2, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1", id));
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT end_ms IS NULL FROM session WHERE id=?1", id));
 }
 
 static void test_epoch_holes_are_not_silently_overwritten(void) {
-    int64_t id = seed_session(BASE_MS, 540, 0);
+    int64_t id = seed_session(NK_TEST_BASE_MS, 540, 0);
     seed_epoch(id, 0, 0.99);
     seed_epoch(id, 2, 0.99);
     nk_data_recovery_report report = {0};
     TEST_ASSERT_EQUAL_INT(NK_ERROR_FORMAT,
-                          nk_data_recover_unfinished(data, BASE_MS + 120000, &report));
+                          nk_data_recover_unfinished(data, NK_TEST_BASE_MS + 120000, &report));
     TEST_ASSERT_EQUAL_INT(2, scalar("SELECT COUNT(*) FROM epoch WHERE session_id=?1", id));
 }
 

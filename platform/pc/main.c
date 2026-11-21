@@ -10,8 +10,8 @@
 #include <SDL3/SDL_main.h>
 #include <string.h>
 
-#define WINDOW_WIDTH  360
-#define WINDOW_HEIGHT 640
+#define NK_PC_WINDOW_WIDTH 360
+#define WINDOW_HEIGHT      640
 
 static lv_display_t *s_disp = NULL;
 static lv_indev_t *s_mouse_indev = NULL;
@@ -86,21 +86,22 @@ int main(int argc, char *argv[]) {
     }
     nk_data_consent_init();
 
-    s_window = SDL_CreateWindow("nemunoki - Onboarding (UX-1)", WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+    s_window =
+        SDL_CreateWindow("nemunoki - Onboarding (UX-1)", NK_PC_WINDOW_WIDTH, WINDOW_HEIGHT, 0);
     s_renderer = SDL_CreateRenderer(s_window, NULL);
     s_texture = SDL_CreateTexture(s_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-                                  WINDOW_WIDTH, WINDOW_HEIGHT);
+                                  NK_PC_WINDOW_WIDTH, WINDOW_HEIGHT);
 
-    uint32_t clear_pixels[WINDOW_WIDTH * WINDOW_HEIGHT];
-    for (int i = 0; i < WINDOW_WIDTH * WINDOW_HEIGHT; i++) {
+    uint32_t clear_pixels[NK_PC_WINDOW_WIDTH * WINDOW_HEIGHT];
+    for (int i = 0; i < NK_PC_WINDOW_WIDTH * WINDOW_HEIGHT; i++) {
         clear_pixels[i] = 0xFFFFFFFF;
     }
-    SDL_UpdateTexture(s_texture, NULL, clear_pixels, WINDOW_WIDTH * 4);
+    SDL_UpdateTexture(s_texture, NULL, clear_pixels, NK_PC_WINDOW_WIDTH * 4);
 
     lv_init();
 
-    static uint32_t buf[WINDOW_WIDTH * 40];
-    s_disp = lv_display_create(WINDOW_WIDTH, WINDOW_HEIGHT);
+    static uint32_t buf[NK_PC_WINDOW_WIDTH * 40];
+    s_disp = lv_display_create(NK_PC_WINDOW_WIDTH, WINDOW_HEIGHT);
     lv_obj_t *idle_screen = lv_display_get_screen_active(s_disp);
     lv_display_set_color_format(s_disp, LV_COLOR_FORMAT_ARGB8888);
     lv_display_set_buffers(s_disp, buf, NULL, sizeof(buf), LV_DISPLAY_RENDER_MODE_PARTIAL);

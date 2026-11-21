@@ -7,23 +7,23 @@
 #include <stdio.h>
 #include <string.h>
 
-#define TEST_FILE "nk_shared_data_test.db"
-#define TEST_KEY  "integration-test-key"
-#define START_MS  INT64_C(1794326400000)
+#define NK_TEST_FILE "nk_shared_data_test.db"
+#define TEST_KEY     "integration-test-key"
+#define START_MS     INT64_C(1794326400000)
 
 void setUp(void);
 void tearDown(void);
 
 static void remove_files(void) {
-    (void)remove(TEST_FILE);
-    (void)remove(TEST_FILE "-wal");
-    (void)remove(TEST_FILE "-shm");
+    (void)remove(NK_TEST_FILE);
+    (void)remove(NK_TEST_FILE "-wal");
+    (void)remove(NK_TEST_FILE "-shm");
 }
 
 void setUp(void) {
     nk_db_close();
     remove_files();
-    TEST_ASSERT_EQUAL_INT(SQLITE_OK, nk_db_open(TEST_FILE, TEST_KEY, (int)strlen(TEST_KEY)));
+    TEST_ASSERT_EQUAL_INT(SQLITE_OK, nk_db_open(NK_TEST_FILE, TEST_KEY, (int)strlen(TEST_KEY)));
 }
 
 void tearDown(void) {
@@ -99,7 +99,7 @@ static void test_development_consent_requires_explicit_reagreement(void) {
 static void test_revocation_is_visible_to_another_connection(void) {
     TEST_ASSERT_TRUE(nk_data_consent_set_agreed(true, 1));
     nk_data *worker = NULL;
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_open(&worker, TEST_FILE, TEST_KEY, strlen(TEST_KEY)));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_open(&worker, NK_TEST_FILE, TEST_KEY, strlen(TEST_KEY)));
     int agreed = 0;
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_has_versioned_consent(worker, "1", &agreed));
     TEST_ASSERT_EQUAL_INT(1, agreed);
@@ -164,7 +164,7 @@ static void test_delete_failure_rolls_back_children(void) {
 static void test_borrowed_ui_connection_is_not_closed_by_adapter(void) {
     nk_db_close();
     nk_data *owner = NULL;
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_open(&owner, TEST_FILE, TEST_KEY, strlen(TEST_KEY)));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_open(&owner, NK_TEST_FILE, TEST_KEY, strlen(TEST_KEY)));
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_db_bind(owner));
     nk_db_close();
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_create_schema(owner));
@@ -190,7 +190,7 @@ static void test_failed_consent_write_does_not_grant_consent(void) {
 static void test_encrypted_database_rejects_a_keyless_reader(void) {
     (void)seed_recording(1);
     nk_db_close();
-    FILE *file = fopen(TEST_FILE, "rb");
+    FILE *file = fopen(NK_TEST_FILE, "rb");
     TEST_ASSERT_NOT_NULL(file);
     char header[16];
     TEST_ASSERT_EQUAL_UINT(16, fread(header, 1, sizeof(header), file));
@@ -198,7 +198,7 @@ static void test_encrypted_database_rejects_a_keyless_reader(void) {
     TEST_ASSERT_TRUE(memcmp(header, "SQLite format 3", 16) != 0);
     sqlite3 *plain = NULL;
     TEST_ASSERT_EQUAL_INT(SQLITE_OK,
-                          sqlite3_open_v2(TEST_FILE, &plain, SQLITE_OPEN_READONLY, NULL));
+                          sqlite3_open_v2(NK_TEST_FILE, &plain, SQLITE_OPEN_READONLY, NULL));
     TEST_ASSERT_NOT_EQUAL_INT(SQLITE_OK,
                               sqlite3_exec(plain, "SELECT * FROM session;", NULL, NULL, NULL));
     TEST_ASSERT_EQUAL_INT(SQLITE_OK, sqlite3_close(plain));
