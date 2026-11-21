@@ -143,6 +143,7 @@ if(ANDROID)
         platform/android/c/android_night.c
         platform/android/c/android_accel.c
         platform/android/c/android_recording.c
+        platform/android/c/android_saved_report.c
     )
 
     target_link_libraries(main PRIVATE

@@ -4,6 +4,7 @@
 #include "android_bridge.h"
 #include "android_consent.h"
 #include "android_night.h"
+#include "android_saved_report.h"
 #include "data.h"
 #include "data_consent.h"
 #include "data_recovery.h"
@@ -16,11 +17,44 @@
 #include <sqlcipher/sqlite3.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #define NK_LOG_TAG "NkAndroid"
 
 static nk_data_recovery_report startup_recovery;
+
+/* Diagnostic launch bypasses schema creation, recovery, consent writes, and measurement. */
+static int show_saved_report(void) {
+    unsigned char key[NK_ANDROID_DB_KEY_SIZE] = {0};
+    char *directory = SDL_GetPrefPath("Mikan-32", "Nemunoki");
+    char *path = NULL;
+    nk_android_saved_report report = {0};
+    char text[1024];
+    nk_result result = NK_ERROR_IO;
+    if (directory != NULL && SDL_asprintf(&path, "%snemunoki.db", directory) >= 0) {
+        result = nk_android_bridge_db_key(key, sizeof(key));
+        if (result == NK_OK) {
+            result = nk_android_saved_report_read(path, key, sizeof(key), &report);
+        }
+    }
+    nk_android_bridge_clear_key(key, sizeof(key));
+    SDL_free(path);
+    SDL_free(directory);
+    if (result == NK_OK) {
+        result = nk_android_saved_report_format(&report, text, sizeof(text));
+    }
+    if (result != NK_OK) {
+        (void)snprintf(text, sizeof(text), "TM02 stored report failed: result=%d", (int)result);
+    }
+    (void)__android_log_print(result == NK_OK ? ANDROID_LOG_INFO : ANDROID_LOG_ERROR, NK_LOG_TAG,
+                              "%s", text);
+    if (!SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "TM-02 saved measurement", text,
+                                  NULL)) {
+        SDL_Log("Saved report dialog failed: %s", SDL_GetError());
+    }
+    return result == NK_OK ? 0 : 1;
+}
 
 JNIEXPORT void JNICALL Java_io_github_mikan32_nemunoki_platform_NativeBridge_nativeOnLaunch(
     JNIEnv *env, jclass bridge_class, jint reason, jint id);
@@ -185,6 +219,12 @@ int main(int argc, char *argv[]) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         SDL_Quit();
         return 1;
+    }
+
+    if (argc == 2 && strcmp(argv[1], "--tm02-report-only") == 0) {
+        int report_result = show_saved_report();
+        SDL_Quit();
+        return report_result;
     }
 
     database_result = open_application_database(&database, &has_consent);
