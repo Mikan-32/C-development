@@ -1178,6 +1178,10 @@ static nk_result recovery_load(nk_data *data, int64_t recovered_ms, nk_recovery_
     if (result == NK_OK) {
         return recovery_finalize(data, statement);
     }
+    /*
+     * 元の復旧エラーを優先して返すため、後片付けの結果では上書きしない。
+     * sqlite3_finalizeはエラーを返しても文を解放する。
+     */
     (void)sqlite3_finalize(statement);
     return result;
 }
@@ -1208,6 +1212,10 @@ static nk_result recovery_open_gaps(nk_data *data, const nk_recovery_item *item,
     if (sqlite3_prepare_v2(data->database, sql, -1, &statement, NULL) != SQLITE_OK ||
         sqlite3_bind_int64(statement, 1, item->id) != SQLITE_OK) {
         nk_result failed = recovery_sql_error(data);
+        /*
+         * 元の復旧エラーを優先して返すため、後片付けの結果では上書きしない。
+         * sqlite3_finalizeはエラーを返しても文を解放する。
+         */
         (void)sqlite3_finalize(statement);
         return failed;
     }
@@ -1261,6 +1269,10 @@ static nk_result recovery_open_gaps(nk_data *data, const nk_recovery_item *item,
     if (result == NK_OK) {
         return recovery_finalize(data, statement);
     }
+    /*
+     * 元の復旧エラーを優先して返すため、後片付けの結果では上書きしない。
+     * sqlite3_finalizeはエラーを返しても文を解放する。
+     */
     (void)sqlite3_finalize(statement);
     return result;
 }
@@ -1371,6 +1383,10 @@ static nk_result recovery_latest(nk_data *data, nk_data_recovery_report *report)
         report->gap_end_ms = sqlite3_column_int64(statement, 2);
     } else if (step != SQLITE_DONE) {
         nk_result result = recovery_sql_error(data);
+        /*
+         * 元の復旧エラーを優先して返すため、後片付けの結果では上書きしない。
+         * sqlite3_finalizeはエラーを返しても文を解放する。
+         */
         (void)sqlite3_finalize(statement);
         return result;
     }
@@ -1417,6 +1433,7 @@ nk_result nk_data_recover_unfinished(nk_data *data, int64_t recovered_ms,
             rollback_result = sqlite3_exec(data->database, "ROLLBACK;", NULL, NULL, NULL);
         }
         if (rollback_result != SQLITE_OK) {
+            /* 元の失敗も残す診断文は切り詰めを許容し、文字数は使わない。 */
             (void)snprintf(data->last_error, sizeof(data->last_error),
                            "Recovery rollback failed (%d); original: %.190s", rollback_result,
                            original);

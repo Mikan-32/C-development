@@ -293,7 +293,10 @@ cleanup:
     nk_accel_features_destroy(features);
     if (nk_android_recording_close(&context.recording) != NK_OK) {
         failed = true;
-        /* nk_data_close retains the object on failure, allowing one retry. */
+        /*
+         * nk_data_closeは失敗時にオブジェクトを保持するため、一度だけ再試行する。
+         * 再試行の成否によらず、最初の終了失敗はfailedとして報告する。
+         */
         (void)nk_android_recording_close(&context.recording);
     }
     if (late_samples != 0 || invalid_samples != 0) {

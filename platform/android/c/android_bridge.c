@@ -68,6 +68,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     return JNI_VERSION_1_6;
 
 failed:
+    /* 初期化失敗はJNI_ERRで返すため、後片付けの結果では上書きしない。 */
     (void)clear_exception(env, "JNI_OnLoad");
     if (bridge.bridge_class != NULL) {
         (*env)->DeleteGlobalRef(env, bridge.bridge_class);

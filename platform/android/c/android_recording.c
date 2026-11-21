@@ -229,6 +229,7 @@ nk_result nk_android_recording_start(nk_android_recording *recording, int64_t st
     if (__system_property_get("ro.product.model", model) > 0) {
         record.device_model = model;
     }
+    /* 戻り値の電源状態は使わず、残量だけ読む。不明な残量は以下でNULL扱いにする。 */
     (void)SDL_GetPowerInfo(NULL, &battery);
     if (battery >= 0 && battery <= 100) {
         record.has_battery_start = 1;
@@ -423,6 +424,7 @@ nk_result nk_android_recording_finish(nk_android_recording *recording, int64_t e
             recording->stop_event_saved = 1;
         }
     }
+    /* 戻り値の電源状態は使わず、残量だけ読む。不明な残量は以下でNULL扱いにする。 */
     (void)SDL_GetPowerInfo(NULL, &battery);
     next = nk_session_finish(recording->session, end_ms, date, reason,
                              battery >= 0 && battery <= 100, battery);

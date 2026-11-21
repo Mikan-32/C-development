@@ -27,6 +27,7 @@ void nk_android_night_ui_init(void) {
     action_status = "Tap START to record accelerometer";
     start_requested = false;
     records_deleted = false;
+    /* タッチ変換の補助設定なので、設定成否で計測を失敗扱いにしない。 */
     (void)SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
 }
 

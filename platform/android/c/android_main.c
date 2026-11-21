@@ -290,6 +290,7 @@ int main(int argc, char *argv[]) {
                 drawing_enabled = true;
             }
             if (drawing_enabled) {
+                /* 操作失敗でもアプリ全体を終了せず、再操作できるよう戻り値は使わない。 */
                 (void)nk_android_night_ui_event(database_result == NK_OK ? database : NULL,
                                                 renderer, &event);
                 if (nk_android_night_ui_take_records_deleted()) {
