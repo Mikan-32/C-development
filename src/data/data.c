@@ -1029,17 +1029,17 @@ typedef struct nk_recovery_gap {
     int64_t start_ms;
 } nk_recovery_gap;
 
-static nk_result nk_recovery_sql_error(nk_data *data) {
+static nk_result recovery_sql_error(nk_data *data) {
     set_error(data, sqlite3_errmsg(data->database));
     return NK_ERROR_DATABASE;
 }
 
-static nk_result nk_recovery_format_error(nk_data *data, const char *message) {
+static nk_result recovery_format_error(nk_data *data, const char *message) {
     set_error(data, message);
     return NK_ERROR_FORMAT;
 }
 
-static nk_result nk_recovery_finalize(nk_data *data, sqlite3_stmt *statement) {
+static nk_result recovery_finalize(nk_data *data, sqlite3_stmt *statement) {
     int result = sqlite3_finalize(statement);
     if (result != SQLITE_OK) {
         set_error(data, sqlite3_errstr(result));
@@ -1049,7 +1049,7 @@ static nk_result nk_recovery_finalize(nk_data *data, sqlite3_stmt *statement) {
 }
 
 /* Gregorian date at the session's recorded UTC offset; no process TZ change. */
-static nk_result nk_recovery_date(nk_data *data, int64_t end_ms, int tz_min, char date[11]) {
+static nk_result recovery_date(nk_data *data, int64_t end_ms, int tz_min, char date[11]) {
     int64_t offset = (int64_t)tz_min * INT64_C(60000);
     int64_t local_ms;
     int64_t days;
@@ -1062,7 +1062,7 @@ static nk_result nk_recovery_date(nk_data *data, int64_t end_ms, int tz_min, cha
     int month;
     int day;
     if (offset > 0 && end_ms > INT64_MAX - offset) {
-        return nk_recovery_format_error(data, "Recovery date overflows");
+        return recovery_format_error(data, "Recovery date overflows");
     }
     local_ms = end_ms + offset;
     days = local_ms / INT64_C(86400000);
@@ -1081,13 +1081,13 @@ static nk_result nk_recovery_date(nk_data *data, int64_t end_ms, int tz_min, cha
     year += month <= 2;
     if (year < 1 || year > 9999 ||
         snprintf(date, 11, "%04d-%02d-%02d", (int)year, month, day) != 10) {
-        return nk_recovery_format_error(data, "Recovery date is outside YYYY-MM-DD range");
+        return recovery_format_error(data, "Recovery date is outside YYYY-MM-DD range");
     }
     return NK_OK;
 }
 
-static nk_result nk_recovery_load(nk_data *data, int64_t recovered_ms, nk_recovery_item **out_items,
-                                  size_t *out_count) {
+static nk_result recovery_load(nk_data *data, int64_t recovered_ms, nk_recovery_item **out_items,
+                               size_t *out_count) {
     static const char sql[] =
         "SELECT s.id,s.start_ms,s.tz_min,s.mic_used,"
         "COALESCE((SELECT MAX(idx) FROM epoch WHERE session_id=s.id),-1),"
@@ -1103,7 +1103,7 @@ static nk_result nk_recovery_load(nk_data *data, int64_t recovered_ms, nk_recove
     *out_items = NULL;
     *out_count = 0;
     if (sqlite3_prepare_v2(data->database, sql, -1, &statement, NULL) != SQLITE_OK) {
-        return nk_recovery_sql_error(data);
+        return recovery_sql_error(data);
     }
     while ((step = sqlite3_step(statement)) == SQLITE_ROW) {
         nk_recovery_item item = {0};
@@ -1119,12 +1119,12 @@ static nk_result nk_recovery_load(nk_data *data, int64_t recovered_ms, nk_recove
             tz < -1439 || tz > 1439 || (mic != 0 && mic != 1) || max_epoch < -1 ||
             max_epoch >= NK_RECOVERY_MAX_EPOCHS || count != max_epoch + 1 || last_good < -1 ||
             last_good > max_epoch) {
-            result = nk_recovery_format_error(
+            result = recovery_format_error(
                 data, "Invalid unfinished session metadata or non-contiguous epochs");
             break;
         }
         if (recovered_ms < item.start_ms) {
-            result = nk_recovery_format_error(
+            result = recovery_format_error(
                 data, "Recovery time precedes session start; check the device clock");
             break;
         }
@@ -1138,7 +1138,7 @@ static nk_result nk_recovery_load(nk_data *data, int64_t recovered_ms, nk_recove
         if (item.user_stop) {
             int64_t stop_ms = sqlite3_column_int64(statement, 6);
             if (stop_ms < item.start_ms || stop_ms > item.end_ms) {
-                result = nk_recovery_format_error(data, "Persisted user stop has an invalid time");
+                result = recovery_format_error(data, "Persisted user stop has an invalid time");
                 break;
             }
             item.end_ms = stop_ms;
@@ -1146,8 +1146,8 @@ static nk_result nk_recovery_load(nk_data *data, int64_t recovered_ms, nk_recove
         item.target_epochs =
             (int)((item.end_ms - item.start_ms + NK_RECOVERY_EPOCH_MS - 1) / NK_RECOVERY_EPOCH_MS);
         if (item.max_epoch >= item.target_epochs) {
-            result = nk_recovery_format_error(data,
-                                              "Saved epochs extend past the recovered session end");
+            result =
+                recovery_format_error(data, "Saved epochs extend past the recovered session end");
             break;
         }
         saved_boundary = item.start_ms + (last_good + 1) * NK_RECOVERY_EPOCH_MS;
@@ -1173,24 +1173,24 @@ static nk_result nk_recovery_load(nk_data *data, int64_t recovered_ms, nk_recove
         (*out_items)[(*out_count)++] = item;
     }
     if (result == NK_OK && step != SQLITE_DONE) {
-        result = nk_recovery_sql_error(data);
+        result = recovery_sql_error(data);
     }
     if (result == NK_OK) {
-        return nk_recovery_finalize(data, statement);
+        return recovery_finalize(data, statement);
     }
     (void)sqlite3_finalize(statement);
     return result;
 }
 
-static void nk_recovery_free_gaps(nk_recovery_gap *gaps, size_t count) {
+static void recovery_free_gaps(nk_recovery_gap *gaps, size_t count) {
     for (size_t i = 0; i < count; ++i) {
         free(gaps[i].reason);
     }
     free(gaps);
 }
 
-static nk_result nk_recovery_open_gaps(nk_data *data, const nk_recovery_item *item,
-                                       nk_recovery_gap **out_gaps, size_t *out_count) {
+static nk_result recovery_open_gaps(nk_data *data, const nk_recovery_item *item,
+                                    nk_recovery_gap **out_gaps, size_t *out_count) {
     static const char sql[] =
         "SELECT e.reason,"
         "SUM(CASE WHEN e.type='GAP_START' THEN 1 ELSE -1 END),"
@@ -1207,7 +1207,7 @@ static nk_result nk_recovery_open_gaps(nk_data *data, const nk_recovery_item *it
     *out_count = 0;
     if (sqlite3_prepare_v2(data->database, sql, -1, &statement, NULL) != SQLITE_OK ||
         sqlite3_bind_int64(statement, 1, item->id) != SQLITE_OK) {
-        nk_result failed = nk_recovery_sql_error(data);
+        nk_result failed = recovery_sql_error(data);
         (void)sqlite3_finalize(statement);
         return failed;
     }
@@ -1230,7 +1230,7 @@ static nk_result nk_recovery_open_gaps(nk_data *data, const nk_recovery_item *it
             strcmp((const char *)last_type, "GAP_START") != 0 ||
             sqlite3_column_type(statement, 2) == SQLITE_NULL || start < item->start_ms ||
             start > item->end_ms) {
-            result = nk_recovery_format_error(data, "Unbalanced or invalid open GAP marker");
+            result = recovery_format_error(data, "Unbalanced or invalid open GAP marker");
             break;
         }
         if (*out_count >= SIZE_MAX / sizeof(**out_gaps) - 1) {
@@ -1256,18 +1256,17 @@ static nk_result nk_recovery_open_gaps(nk_data *data, const nk_recovery_item *it
         ++*out_count;
     }
     if (result == NK_OK && step != SQLITE_DONE) {
-        result = nk_recovery_sql_error(data);
+        result = recovery_sql_error(data);
     }
     if (result == NK_OK) {
-        return nk_recovery_finalize(data, statement);
+        return recovery_finalize(data, statement);
     }
     (void)sqlite3_finalize(statement);
     return result;
 }
 
-static nk_result nk_recovery_gap_event(nk_data *data, const nk_recovery_item *item,
-                                       nk_event_type type, const char *reason, int64_t start_ms,
-                                       int64_t end_ms) {
+static nk_result recovery_gap_event(nk_data *data, const nk_recovery_item *item, nk_event_type type,
+                                    const char *reason, int64_t start_ms, int64_t end_ms) {
     nk_event_record event = {0};
     event.session_id = item->id;
     event.type = type;
@@ -1277,17 +1276,17 @@ static nk_result nk_recovery_gap_event(nk_data *data, const nk_recovery_item *it
     return nk_data_event_insert(data, &event);
 }
 
-static nk_result nk_recovery_one(nk_data *data, const nk_recovery_item *item,
-                                 nk_data_recovery_report *report) {
+static nk_result recovery_one(nk_data *data, const nk_recovery_item *item,
+                              nk_data_recovery_report *report) {
     nk_recovery_gap *gaps = NULL;
     size_t gap_count = 0;
     int had_q04 = 0;
     char date[11];
-    nk_result result = nk_recovery_date(data, item->end_ms, item->tz_min, date);
+    nk_result result = recovery_date(data, item->end_ms, item->tz_min, date);
     if (result != NK_OK) {
         return result;
     }
-    result = nk_recovery_open_gaps(data, item, &gaps, &gap_count);
+    result = recovery_open_gaps(data, item, &gaps, &gap_count);
     if (result != NK_OK) {
         goto cleanup;
     }
@@ -1302,7 +1301,7 @@ static nk_result nk_recovery_one(nk_data *data, const nk_recovery_item *item,
                 goto cleanup;
             }
             if (report->added_epochs == INT_MAX) {
-                result = nk_recovery_format_error(data, "Recovery epoch count overflows");
+                result = recovery_format_error(data, "Recovery epoch count overflows");
                 goto cleanup;
             }
             ++report->added_epochs;
@@ -1314,19 +1313,19 @@ static nk_result nk_recovery_one(nk_data *data, const nk_recovery_item *item,
         if (end_ms < gaps[i].start_ms) {
             end_ms = gaps[i].start_ms;
         }
-        result = nk_recovery_gap_event(data, item, NK_EVENT_GAP_END, gaps[i].reason,
-                                       gaps[i].start_ms, end_ms);
+        result = recovery_gap_event(data, item, NK_EVENT_GAP_END, gaps[i].reason, gaps[i].start_ms,
+                                    end_ms);
         if (result != NK_OK) {
             goto cleanup;
         }
         had_q04 |= q04;
     }
     if (!item->user_stop && !had_q04 && item->end_ms - item->gap_start_ms >= INT64_C(60000)) {
-        result = nk_recovery_gap_event(data, item, NK_EVENT_GAP_START, "Q04", item->gap_start_ms,
-                                       item->end_ms);
+        result = recovery_gap_event(data, item, NK_EVENT_GAP_START, "Q04", item->gap_start_ms,
+                                    item->end_ms);
         if (result == NK_OK) {
-            result = nk_recovery_gap_event(data, item, NK_EVENT_GAP_END, "Q04", item->gap_start_ms,
-                                           item->end_ms);
+            result = recovery_gap_event(data, item, NK_EVENT_GAP_END, "Q04", item->gap_start_ms,
+                                        item->end_ms);
         }
         if (result != NK_OK) {
             goto cleanup;
@@ -1346,11 +1345,11 @@ static nk_result nk_recovery_one(nk_data *data, const nk_recovery_item *item,
         }
     }
 cleanup:
-    nk_recovery_free_gaps(gaps, gap_count);
+    recovery_free_gaps(gaps, gap_count);
     return result;
 }
 
-static nk_result nk_recovery_latest(nk_data *data, nk_data_recovery_report *report) {
+static nk_result recovery_latest(nk_data *data, nk_data_recovery_report *report) {
     static const char sql[] =
         "SELECT s.id,e.t_ms-e.dur_ms,e.t_ms FROM session s JOIN event e ON e.session_id=s.id "
         "WHERE s.end_ms IS NOT NULL AND s.end_reason='SERVICE_KILLED' "
@@ -1362,7 +1361,7 @@ static nk_result nk_recovery_latest(nk_data *data, nk_data_recovery_report *repo
     sqlite3_stmt *statement = NULL;
     int step;
     if (sqlite3_prepare_v2(data->database, sql, -1, &statement, NULL) != SQLITE_OK) {
-        return nk_recovery_sql_error(data);
+        return recovery_sql_error(data);
     }
     step = sqlite3_step(statement);
     if (step == SQLITE_ROW) {
@@ -1371,11 +1370,11 @@ static nk_result nk_recovery_latest(nk_data *data, nk_data_recovery_report *repo
         report->gap_start_ms = sqlite3_column_int64(statement, 1);
         report->gap_end_ms = sqlite3_column_int64(statement, 2);
     } else if (step != SQLITE_DONE) {
-        nk_result result = nk_recovery_sql_error(data);
+        nk_result result = recovery_sql_error(data);
         (void)sqlite3_finalize(statement);
         return result;
     }
-    return nk_recovery_finalize(data, statement);
+    return recovery_finalize(data, statement);
 }
 
 nk_result nk_data_recover_unfinished(nk_data *data, int64_t recovered_ms,
@@ -1399,13 +1398,13 @@ nk_result nk_data_recover_unfinished(nk_data *data, int64_t recovered_ms,
     if (result != NK_OK) {
         return result;
     }
-    result = nk_recovery_load(data, recovered_ms, &items, &count);
+    result = recovery_load(data, recovered_ms, &items, &count);
     for (size_t i = 0; result == NK_OK && i < count; ++i) {
-        result = nk_recovery_one(data, &items[i], &pending);
+        result = recovery_one(data, &items[i], &pending);
     }
     free(items);
     if (result == NK_OK) {
-        result = nk_recovery_latest(data, &pending);
+        result = recovery_latest(data, &pending);
     }
     if (result == NK_OK) {
         result = execute_sql(data, "COMMIT;");
