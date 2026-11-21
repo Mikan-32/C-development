@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define TEST_DB         "nk_data_recovery_test.db"
+#define NK_TEST_DB      "nk_data_recovery_test.db"
 #define NK_TEST_BASE_MS INT64_C(1794326400000)
 
 static const unsigned char test_key[] = "0123456789abcdef0123456789abcdef";
@@ -18,15 +18,16 @@ void setUp(void);
 void tearDown(void);
 
 static void remove_files(void) {
-    (void)remove(TEST_DB);
-    (void)remove(TEST_DB "-wal");
-    (void)remove(TEST_DB "-shm");
+    (void)remove(NK_TEST_DB);
+    (void)remove(NK_TEST_DB "-wal");
+    (void)remove(NK_TEST_DB "-shm");
 }
 
 static void open_handles(void) {
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_open(&data, TEST_DB, test_key, sizeof(test_key) - 1));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_open(&data, NK_TEST_DB, test_key, sizeof(test_key) - 1));
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_create_schema(data));
-    TEST_ASSERT_EQUAL_INT(SQLITE_OK, sqlite3_open_v2(TEST_DB, &probe, SQLITE_OPEN_READWRITE, NULL));
+    TEST_ASSERT_EQUAL_INT(SQLITE_OK,
+                          sqlite3_open_v2(NK_TEST_DB, &probe, SQLITE_OPEN_READWRITE, NULL));
     TEST_ASSERT_EQUAL_INT(SQLITE_OK, sqlite3_key(probe, test_key, (int)sizeof(test_key) - 1));
 }
 

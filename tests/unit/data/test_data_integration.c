@@ -7,9 +7,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#define NK_TEST_FILE "nk_shared_data_test.db"
-#define TEST_KEY     "integration-test-key"
-#define START_MS     INT64_C(1794326400000)
+#define NK_TEST_FILE     "nk_shared_data_test.db"
+#define NK_TEST_KEY      "integration-test-key"
+#define NK_TEST_START_MS INT64_C(1794326400000)
 
 void setUp(void);
 void tearDown(void);
@@ -23,7 +23,8 @@ static void remove_files(void) {
 void setUp(void) {
     nk_db_close();
     remove_files();
-    TEST_ASSERT_EQUAL_INT(SQLITE_OK, nk_db_open(NK_TEST_FILE, TEST_KEY, (int)strlen(TEST_KEY)));
+    TEST_ASSERT_EQUAL_INT(SQLITE_OK,
+                          nk_db_open(NK_TEST_FILE, NK_TEST_KEY, (int)strlen(NK_TEST_KEY)));
 }
 
 void tearDown(void) {
@@ -46,7 +47,7 @@ static int64_t seed_recording(int finish) {
     nk_session *session = NULL;
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_session_create(&session, nk_db_get_data()));
     nk_session_record record = {0};
-    record.start_ms = START_MS;
+    record.start_ms = NK_TEST_START_MS;
     record.target_sleep_min = 420;
     record.app_ver = "integration-test";
     record.algo_ver = "unscored";
@@ -57,12 +58,13 @@ static int64_t seed_recording(int finish) {
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_session_save_epoch(session, &epoch));
     nk_event_record event = {0};
     event.type = NK_EVENT_USER;
-    event.t_ms = START_MS;
+    event.t_ms = NK_TEST_START_MS;
     event.reason = "TEST";
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_session_save_event(session, &event));
     if (finish) {
-        TEST_ASSERT_EQUAL_INT(NK_OK, nk_session_finish(session, START_MS + 30000, "2026-11-11",
-                                                       NK_SESSION_END_USER_STOP, 0, 0));
+        TEST_ASSERT_EQUAL_INT(NK_OK,
+                              nk_session_finish(session, NK_TEST_START_MS + 30000, "2026-11-11",
+                                                NK_SESSION_END_USER_STOP, 0, 0));
     }
     nk_session_destroy(session);
     return id;
@@ -88,7 +90,7 @@ static void test_consent_version_is_shared_and_requires_exact_version(void) {
 }
 
 static void test_development_consent_requires_explicit_reagreement(void) {
-    nk_consent_record consent = {"dev-accel-1", 1, 0, START_MS};
+    nk_consent_record consent = {"dev-accel-1", 1, 0, NK_TEST_START_MS};
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_consent_set(nk_db_get_data(), &consent));
     TEST_ASSERT_TRUE(nk_data_consent_needs_reagreement(1));
     int agreed = 1;
@@ -99,7 +101,8 @@ static void test_development_consent_requires_explicit_reagreement(void) {
 static void test_revocation_is_visible_to_another_connection(void) {
     TEST_ASSERT_TRUE(nk_data_consent_set_agreed(true, 1));
     nk_data *worker = NULL;
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_open(&worker, NK_TEST_FILE, TEST_KEY, strlen(TEST_KEY)));
+    TEST_ASSERT_EQUAL_INT(NK_OK,
+                          nk_data_open(&worker, NK_TEST_FILE, NK_TEST_KEY, strlen(NK_TEST_KEY)));
     int agreed = 0;
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_has_versioned_consent(worker, "1", &agreed));
     TEST_ASSERT_EQUAL_INT(1, agreed);
@@ -109,7 +112,7 @@ static void test_revocation_is_visible_to_another_connection(void) {
     nk_session *session = NULL;
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_session_create(&session, worker));
     nk_session_record record = {0};
-    record.start_ms = START_MS;
+    record.start_ms = NK_TEST_START_MS;
     TEST_ASSERT_EQUAL_INT(NK_ERROR_CONSENT_REQUIRED, nk_session_start(session, &record));
     nk_session_destroy(session);
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_close(worker));
@@ -164,7 +167,8 @@ static void test_delete_failure_rolls_back_children(void) {
 static void test_borrowed_ui_connection_is_not_closed_by_adapter(void) {
     nk_db_close();
     nk_data *owner = NULL;
-    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_open(&owner, NK_TEST_FILE, TEST_KEY, strlen(TEST_KEY)));
+    TEST_ASSERT_EQUAL_INT(NK_OK,
+                          nk_data_open(&owner, NK_TEST_FILE, NK_TEST_KEY, strlen(NK_TEST_KEY)));
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_db_bind(owner));
     nk_db_close();
     TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_create_schema(owner));

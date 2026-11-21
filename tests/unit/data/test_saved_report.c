@@ -5,9 +5,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#define TEST_DB  "nk_saved_report_test.db"
-#define TEST_KEY "saved-report-test-key"
-#define START_MS INT64_C(1795190400000)
+#define NK_TEST_DB       "nk_saved_report_test.db"
+#define NK_TEST_KEY      "saved-report-test-key"
+#define NK_TEST_START_MS INT64_C(1795190400000)
 
 void setUp(void);
 void tearDown(void);
@@ -27,14 +27,14 @@ static int scalar(const char *sql) {
 }
 
 static void remove_files(void) {
-    (void)remove(TEST_DB);
-    (void)remove(TEST_DB "-wal");
-    (void)remove(TEST_DB "-shm");
+    (void)remove(NK_TEST_DB);
+    (void)remove(NK_TEST_DB "-wal");
+    (void)remove(NK_TEST_DB "-shm");
 }
 
 void setUp(void) {
     remove_files();
-    TEST_ASSERT_EQUAL_INT(SQLITE_OK, nk_db_open(TEST_DB, TEST_KEY, sizeof(TEST_KEY) - 1));
+    TEST_ASSERT_EQUAL_INT(SQLITE_OK, nk_db_open(NK_TEST_DB, NK_TEST_KEY, sizeof(NK_TEST_KEY) - 1));
 }
 
 void tearDown(void) {
@@ -43,7 +43,7 @@ void tearDown(void) {
 }
 
 static nk_result read_report(nk_android_saved_report *report) {
-    return nk_android_saved_report_read(TEST_DB, TEST_KEY, sizeof(TEST_KEY) - 1, report);
+    return nk_android_saved_report_read(NK_TEST_DB, NK_TEST_KEY, sizeof(NK_TEST_KEY) - 1, report);
 }
 
 static void seed_session(void) {
@@ -74,7 +74,7 @@ static void test_overnight_metrics_and_stored_battery_are_reconstructed(void) {
     TEST_ASSERT_EQUAL_INT(NK_OK, read_report(&report));
     TEST_ASSERT_EQUAL_INT(version, scalar("PRAGMA data_version;"));
     TEST_ASSERT_TRUE(report.finished);
-    TEST_ASSERT_EQUAL_INT64(START_MS, report.start_ms);
+    TEST_ASSERT_EQUAL_INT64(NK_TEST_START_MS, report.start_ms);
     TEST_ASSERT_EQUAL_INT64(1066, report.expected_epochs);
     TEST_ASSERT_EQUAL_INT64(1066, report.epochs);
     TEST_ASSERT_EQUAL_INT64(1065, report.good_acc_epochs);
@@ -124,7 +124,7 @@ static void test_wrong_key_is_rejected_without_returning_partial_data(void) {
     nk_android_saved_report report;
     memset(&report, 0x5a, sizeof(report));
     TEST_ASSERT_EQUAL_INT(NK_ERROR_DATABASE,
-                          nk_android_saved_report_read(TEST_DB, "wrong-key", 9, &report));
+                          nk_android_saved_report_read(NK_TEST_DB, "wrong-key", 9, &report));
     TEST_ASSERT_EQUAL_INT(0, report.found);
     TEST_ASSERT_EQUAL_INT64(0, report.session_id);
 }
@@ -133,8 +133,9 @@ static void test_missing_database_is_not_created(void) {
     const char *missing = "nk_saved_report_absent.db";
     (void)remove(missing);
     nk_android_saved_report report;
-    TEST_ASSERT_EQUAL_INT(NK_ERROR_DATABASE, nk_android_saved_report_read(
-                                                 missing, TEST_KEY, sizeof(TEST_KEY) - 1, &report));
+    TEST_ASSERT_EQUAL_INT(
+        NK_ERROR_DATABASE,
+        nk_android_saved_report_read(missing, NK_TEST_KEY, sizeof(NK_TEST_KEY) - 1, &report));
     FILE *file = fopen(missing, "rb");
     TEST_ASSERT_NULL(file);
 }
@@ -158,8 +159,9 @@ static void test_zero_duration_and_small_output_buffer(void) {
     TEST_ASSERT_NOT_NULL(strstr(text, "end_reason=ERROR"));
     TEST_ASSERT_NOT_NULL(strstr(text, "good_acc_pct=unknown"));
     TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT, nk_android_saved_report_format(&report, text, 4));
-    TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT, nk_android_saved_report_read(
-                                                 NULL, TEST_KEY, sizeof(TEST_KEY) - 1, &report));
+    TEST_ASSERT_EQUAL_INT(
+        NK_ERROR_ARGUMENT,
+        nk_android_saved_report_read(NULL, NK_TEST_KEY, sizeof(NK_TEST_KEY) - 1, &report));
     TEST_ASSERT_EQUAL_INT(NK_ERROR_ARGUMENT,
                           nk_android_saved_report_format(NULL, text, sizeof(text)));
 }
