@@ -10,6 +10,11 @@
 int nk_db_open(const char *path, const char *key, int key_len);
 void nk_db_close(void);
 bool nk_db_is_open(void);
+/*
+ * 以下は借用したポインターを返す。
+ * 呼び出し側でsqlite3_close・nk_data_close・freeしてはいけない。
+ * 接続の解放・付け替えまで、UIスレッド内だけで使用する。
+ */
 sqlite3 *nk_db_get_handle(void);
 nk_data *nk_db_get_data(void);
 

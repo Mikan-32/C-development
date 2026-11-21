@@ -60,6 +60,7 @@ nk_result nk_audio_features_create(nk_audio_features **out_features,
  * 16 kHz・モノラル・符号付き16bit PCMを渡す。
  *
  * sample_countは今回渡すサンプル数。
+ * samplesは呼び出し中だけ借用し、保持・解放しない。
  * 1秒分そろうたびにcallbackを呼び出す。
  *
  * flagsには以下のみ指定できる。
