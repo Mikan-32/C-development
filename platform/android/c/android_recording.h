@@ -9,6 +9,7 @@ typedef struct nk_android_recording nk_android_recording;
 /* Use all functions on the sensor owner thread. No UI DB handle is shared. */
 /* The caller must close any returned object, even if open returns an error. */
 nk_result nk_android_recording_open(nk_android_recording **out_recording);
+nk_result nk_android_recording_check_consent(nk_android_recording *recording);
 nk_result nk_android_recording_start(nk_android_recording *recording, int64_t start_ms);
 nk_result nk_android_recording_push_second(nk_android_recording *recording,
                                            const nk_sensing_second *second);

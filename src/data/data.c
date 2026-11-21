@@ -1,5 +1,6 @@
 #include "data.h"
 
+#include "data_internal.h"
 #include "data_recovery.h"
 
 #include <limits.h>
@@ -7,13 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define NK_DATA_ERROR_SIZE 256
-
-struct nk_data {
-    sqlite3 *database;
-    char last_error[NK_DATA_ERROR_SIZE];
-};
 
 static void set_error(nk_data *data, const char *message) {
     if (data == NULL) {
@@ -221,7 +215,8 @@ nk_result nk_data_open(nk_data **out_data, const char *path, const void *key, si
         return NK_ERROR_DATABASE;
     }
 
-    if (verify_key(data) != NK_OK) {
+    /* UI consent/deletion and the sensor worker use separate WAL connections. */
+    if (sqlite3_busy_timeout(data->database, 5000) != SQLITE_OK || verify_key(data) != NK_OK) {
         /*
          * 初期化失敗の後片付け。
          * 接続は外部へ未公開で、SQL文も解放済み。
@@ -351,8 +346,8 @@ nk_result nk_data_create_schema(nk_data *data) {
              * snprintfの文字数は使用しない。
              */
             (void)snprintf(data->last_error, sizeof(data->last_error),
-                           "Rollback failed (%s); original: %s", sqlite3_errstr(rollback_result),
-                           original_error);
+                           "Rollback failed (%s); original: %.160s",
+                           sqlite3_errstr(rollback_result), original_error);
         } else {
             set_error(data, original_error);
         }
@@ -1098,7 +1093,7 @@ static nk_result nk_recovery_load(nk_data *data, int64_t recovered_ms, nk_recove
         "COALESCE((SELECT MAX(idx) FROM epoch WHERE session_id=s.id),-1),"
         "(SELECT COUNT(*) FROM epoch WHERE session_id=s.id),"
         "(SELECT MAX(t_ms) FROM event WHERE session_id=s.id AND type='USER' AND "
-        "reason='USER_STOP'),"
+        "reason IN ('USER_STOP','CONSENT_REVOKED')),"
         "COALESCE((SELECT MAX(idx) FROM epoch WHERE session_id=s.id AND acc_cov>=0.8),-1) "
         "FROM session s WHERE s.end_ms IS NULL ORDER BY s.id;";
     sqlite3_stmt *statement = NULL;

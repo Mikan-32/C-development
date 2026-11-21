@@ -1,9 +1,11 @@
 #include "android_consent.h"
 
+#include "data_consent.h"
+
 #include <android/log.h>
 #include <stdint.h>
 
-#define NK_CONSENT_VERSION "dev-accel-1"
+#define NK_CONSENT_VERSION NK_DATA_CONSENT_CURRENT_VERSION_TEXT
 #define NK_CONSENT_LOG_TAG "NkAndroid"
 
 nk_result nk_android_consent_request(SDL_Window *window, nk_data *data, int *out_has_consent) {
@@ -21,7 +23,7 @@ nk_result nk_android_consent_request(SDL_Window *window, nk_data *data, int *out
                    "計測した場合、集計した記録をこの端末内に暗号化して保存します。"
                    "サーバーには送りません。生の加速度は保存しません。\n\n"
                    "マイクの使用と録音は、この同意には含みません。\n\n"
-                   "この画面には同意の取消・記録削除機能はまだありません。\n\n"
+                   "同意の取消・記録削除は、起動画面のPRIVACYから行えます。\n\n"
                    "同意を保存するだけでは、計測は始まりません。",
         .numbuttons = 2,
         .buttons = buttons,
@@ -38,7 +40,7 @@ nk_result nk_android_consent_request(SDL_Window *window, nk_data *data, int *out
 
     *out_has_consent = 0;
 
-    result = nk_data_has_measurement_consent(data, out_has_consent);
+    result = nk_data_has_versioned_consent(data, NK_CONSENT_VERSION, out_has_consent);
 
     if (result != NK_OK) {
         *out_has_consent = 0;
@@ -78,7 +80,7 @@ nk_result nk_android_consent_request(SDL_Window *window, nk_data *data, int *out
         return result;
     }
 
-    result = nk_data_has_measurement_consent(data, out_has_consent);
+    result = nk_data_has_versioned_consent(data, NK_CONSENT_VERSION, out_has_consent);
 
     if (result != NK_OK || !*out_has_consent) {
         *out_has_consent = 0;

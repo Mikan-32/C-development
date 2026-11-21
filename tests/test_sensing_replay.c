@@ -1,5 +1,4 @@
 #include "replay.h"
-
 #include "unity.h"
 
 #include <stdio.h>

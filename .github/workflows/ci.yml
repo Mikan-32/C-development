@@ -25,9 +25,11 @@ jobs:
       - name: ツールを入れる（mise.toml の版）
         uses: jdx/mise-action@v5
       - name: clang とサニタイザーのランタイムを入れる
-        run: sudo apt-get update && sudo apt-get install -y clang libclang-rt-18-dev
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-rt-18-dev libssl-dev tcl make
       - name: 整形チェック（clang-format）
         run: git ls-files '*.c' '*.h' ':!:third_party/**' | xargs -r clang-format --dry-run --Werror
+      - name: SQLCipher の固定ソースから amalgamation を生成
+        run: bash scripts/generate-sqlcipher.sh
       - name: 構成
         run: cmake --preset linux-sanitize
       - name: ビルド
@@ -44,6 +46,21 @@ jobs:
           submodules: recursive
       - name: Visual Studio の開発者環境を読み込む
         uses: ilammy/msvc-dev-cmd@v1
+      - name: OpenSSL のビルド済みライブラリをキャッシュ
+        id: openssl-cache
+        uses: actions/cache@v5
+        with:
+          path: third_party/prebuilt/openssl
+          key: windows-x64-debug-openssl-${{ hashFiles('cmake/dependencies.json', 'scripts/build-openssl-windows.ps1') }}
+      - name: Windows 用 OpenSSL を作る
+        if: steps.openssl-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $perl = (Get-Command perl.exe -CommandType Application -ErrorAction Stop).Source
+          ./scripts/build-openssl-windows.ps1 -PerlPath $perl -Configuration Debug
+      - name: SQLCipher の固定ソースから amalgamation を生成
+        shell: cmd
+        run: scripts\generate-sqlcipher.cmd
       - name: 構成
         run: cmake --preset windows-clang -DNK_WARNINGS_AS_ERRORS=ON
       - name: ビルド
@@ -70,6 +87,20 @@ jobs:
             exit 1
           fi
           echo "ANDROID_NDK=$ndk" >> "$GITHUB_ENV"
+          echo "NK_NDK_VERSION=$rev" >> "$GITHUB_ENV"
+      - name: ソース生成用のツールを入れる
+        run: sudo apt-get update && sudo apt-get install -y tcl make perl
+      - name: Android 用 OpenSSL をキャッシュ
+        id: android-openssl-cache
+        uses: actions/cache@v5
+        with:
+          path: third_party/prebuilt/openssl
+          key: android-arm64-api26-ndk${{ env.NK_NDK_VERSION }}-openssl-${{ hashFiles('cmake/dependencies.json', 'scripts/build-openssl-android.sh') }}
+      - name: Android 用 OpenSSL を作る
+        if: steps.android-openssl-cache.outputs.cache-hit != 'true'
+        run: bash scripts/build-openssl-android.sh "$ANDROID_NDK" arm64-v8a
+      - name: SQLCipher の固定ソースから amalgamation を生成
+        run: bash scripts/generate-sqlcipher.sh
       - name: 構成
         run: cmake --preset android-arm64
       - name: ビルド

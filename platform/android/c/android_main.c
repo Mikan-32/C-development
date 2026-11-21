@@ -5,7 +5,9 @@
 #include "android_consent.h"
 #include "android_night.h"
 #include "data.h"
+#include "data_consent.h"
 #include "data_recovery.h"
+#include "nk_db.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -110,7 +112,11 @@ static nk_result open_application_database(nk_data **out_data, int *out_has_cons
                 (long long)(startup_recovery.gap_end_ms - startup_recovery.gap_start_ms));
         }
     }
-    result = nk_data_has_measurement_consent(*out_data, out_has_consent);
+    result = nk_db_bind(*out_data);
+    if (result == NK_OK) {
+        result = nk_data_has_versioned_consent(*out_data, NK_DATA_CONSENT_CURRENT_VERSION_TEXT,
+                                               out_has_consent);
+    }
 
 cleanup:
     nk_android_bridge_clear_key(key, sizeof(key));
@@ -246,6 +252,17 @@ int main(int argc, char *argv[]) {
             if (drawing_enabled) {
                 (void)nk_android_night_ui_event(database_result == NK_OK ? database : NULL,
                                                 renderer, &event);
+                if (nk_android_night_ui_take_records_deleted()) {
+                    startup_recovery = (nk_data_recovery_report){0};
+                }
+                if (database_result == NK_OK) {
+                    int agreed = 0;
+                    nk_result consent_read = nk_data_has_versioned_consent(
+                        database, NK_DATA_CONSENT_CURRENT_VERSION_TEXT, &agreed);
+                    consent_status = consent_read == NK_OK && agreed
+                                         ? "Measurement consent: granted"
+                                         : "Measurement consent: not granted";
+                }
             }
         }
         if (!running) {
@@ -282,6 +299,7 @@ cleanup:
     if (window != NULL) {
         SDL_DestroyWindow(window);
     }
+    nk_db_close(); /* Unbind the borrowed UI connection before closing it. */
     if (database != NULL) {
         nk_result close_result = nk_data_close(database);
         if (close_result != NK_OK) {

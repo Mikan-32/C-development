@@ -1,15 +1,7 @@
-add_library(nk_replay STATIC
-    replay.c
-    wav_reader.c
-)
-
-target_include_directories(nk_replay
-    PUBLIC
-        "${CMAKE_CURRENT_SOURCE_DIR}"
-)
-
-target_link_libraries(nk_replay
-    PUBLIC
-        nk_options
-        nk_sensing
-)
+add_library(nk_replay STATIC replay.c wav_reader.c)
+target_include_directories(nk_replay PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(nk_replay PUBLIC nk_options nk_sensing)
+if(NK_BUILD_PC_UI)
+    add_executable(nemunoki_pc main.c)
+    target_link_libraries(nemunoki_pc PRIVATE nk_ui nk_data nk_options SDL3::SDL3)
+endif()

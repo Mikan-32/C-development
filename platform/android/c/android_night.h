@@ -15,6 +15,8 @@ nk_result nk_android_night_ui_event(nk_data *data, SDL_Renderer *renderer, const
 
 nk_result nk_android_night_ui_draw(SDL_Renderer *renderer);
 
+/* UI-thread notification to invalidate cached history after successful deletion. */
+bool nk_android_night_ui_take_records_deleted(void);
 nk_result nk_android_night_ui_shutdown(void);
 
 #endif

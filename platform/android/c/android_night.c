@@ -2,14 +2,18 @@
 
 #include "android_accel.h"
 #include "android_bridge.h"
+#include "android_consent.h"
+#include "data_consent.h"
 
 #include <SDL3/SDL_system.h>
 #include <android/log.h>
 
 static const SDL_FRect start_button = {20.0f, 300.0f, 150.0f, 50.0f};
 static const SDL_FRect stop_button = {190.0f, 300.0f, 150.0f, 50.0f};
+static const SDL_FRect privacy_button = {20.0f, 438.0f, 320.0f, 25.0f};
 static const char *action_status = "Tap START to record accelerometer";
 static bool start_requested;
+static bool records_deleted;
 
 static void SDLCALL notification_permission_result(void *userdata, const char *permission,
                                                    bool granted) {
@@ -22,6 +26,7 @@ static void SDLCALL notification_permission_result(void *userdata, const char *p
 void nk_android_night_ui_init(void) {
     action_status = "Tap START to record accelerometer";
     start_requested = false;
+    records_deleted = false;
     (void)SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
 }
 
@@ -33,7 +38,8 @@ static nk_result request_start(nk_data *data) {
     if (data == NULL) {
         return NK_ERROR_ARGUMENT;
     }
-    result = nk_data_has_measurement_consent(data, &has_consent);
+    result =
+        nk_data_has_versioned_consent(data, NK_DATA_CONSENT_CURRENT_VERSION_TEXT, &has_consent);
     if (result != NK_OK) {
         return result;
     }
@@ -75,6 +81,56 @@ static bool contains(const SDL_FRect *button, float x, float y) {
            y < button->y + button->h;
 }
 
+static nk_result privacy_action(nk_data *data, SDL_Renderer *renderer) {
+    const SDL_MessageBoxButtonData buttons[] = {
+        {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "戻る"},
+        {0, 1, "同意を取り消す"},
+        {0, 2, "停止済みの記録をすべて削除"},
+        {0, 3, "計測への同意を確認する"}};
+    const SDL_MessageBoxData dialog = {
+        SDL_MESSAGEBOX_INFORMATION,
+        SDL_GetRenderWindow(renderer),
+        "データと同意",
+        "同意を取り消すと計測を停止します。\n"
+        "記録を削除する場合は、先に計測の停止完了を待ってください。\n"
+        "削除を選ぶと、保存された計測記録をすべて削除します。",
+        4,
+        buttons,
+        NULL};
+    int selected = 0;
+    if (data == NULL || !SDL_ShowMessageBox(&dialog, &selected)) {
+        return NK_ERROR_IO;
+    }
+    if (selected == 1) {
+        if (!nk_data_consent_set_agreed(false, 0)) {
+            action_status = "Consent revoke failed; check log";
+            return NK_ERROR_DATABASE;
+        }
+        nk_result result = nk_android_bridge_night_stop();
+        action_status =
+            result == NK_OK ? "Consent revoked; stopping recording" : "Stop failed; check log";
+        return result;
+    }
+    if (selected == 2) {
+        if (nk_android_accel_is_active()) {
+            action_status = "Stop recording before deleting";
+            return NK_ERROR_ALREADY_RUNNING;
+        }
+        nk_result result = nk_data_delete_all_sessions(data);
+        records_deleted = result == NK_OK;
+        action_status = result == NK_OK ? "Saved recordings deleted" : "Delete failed; check log";
+        return result;
+    }
+    if (selected == 3) {
+        int agreed = 0;
+        nk_result result = nk_android_consent_request(SDL_GetRenderWindow(renderer), data, &agreed);
+        action_status =
+            result == NK_OK && agreed ? "Consent granted; tap START" : "Consent not granted";
+        return result;
+    }
+    return NK_OK;
+}
+
 nk_result nk_android_night_ui_event(nk_data *data, SDL_Renderer *renderer, const SDL_Event *input) {
     SDL_Event event;
     nk_result result;
@@ -114,6 +170,8 @@ nk_result nk_android_night_ui_event(nk_data *data, SDL_Renderer *renderer, const
     } else if (contains(&stop_button, event.button.x, event.button.y)) {
         result = nk_android_bridge_night_stop();
         action_status = result == NK_OK ? "Stop requested" : "Stop failed; check log";
+    } else if (contains(&privacy_button, event.button.x, event.button.y)) {
+        result = privacy_action(data, renderer);
     } else {
         return NK_OK;
     }
@@ -149,11 +207,18 @@ nk_result nk_android_night_ui_draw(SDL_Renderer *renderer) {
         !SDL_RenderDebugText(renderer, 20.0f, 240.0f, state_text) ||
         !draw_button(renderer, &start_button, "START service") ||
         !draw_button(renderer, &stop_button, "STOP service") ||
+        !draw_button(renderer, &privacy_button, "PRIVACY") ||
         !SDL_RenderDebugText(renderer, 20.0f, 380.0f, action_status) ||
         !SDL_RenderDebugText(renderer, 20.0f, 420.0f, nk_android_accel_status())) {
         return NK_ERROR_IO;
     }
     return NK_OK;
+}
+
+bool nk_android_night_ui_take_records_deleted(void) {
+    bool deleted = records_deleted;
+    records_deleted = false;
+    return deleted;
 }
 
 nk_result nk_android_night_ui_shutdown(void) {

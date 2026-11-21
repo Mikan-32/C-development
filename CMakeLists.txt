@@ -8,6 +8,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(NK_BUILD_PC_UI "Build the SDL/LVGL PC applications" ON)
 option(NK_BUILD_TESTS "単体テスト（Unity）をビルドする" ON)
 option(NK_ENABLE_SANITIZERS "AddressSanitizer と UndefinedBehaviorSanitizer を有効にする（Linux の clang 用）" OFF)
 option(NK_WARNINGS_AS_ERRORS "警告をエラーとして扱う（CI では ON）" OFF)
@@ -20,17 +21,17 @@ add_library(nk_options INTERFACE)
 
 if(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # clang-cl（Windows）
-    target_compile_options(nk_options INTERFACE /W4)
-
+    # /utf-8：画面の日本語（UTF-8 のソース）を文字化けさせないため。clang-cl では既定と同じ
+    target_compile_options(nk_options INTERFACE /W4 /utf-8)
+    # fopen などの標準 C の関数に「fopen_s を使え」と出る警告を止める（fopen_s は Linux・Android にない）
+    target_compile_definitions(nk_options INTERFACE _CRT_SECURE_NO_WARNINGS)
     if(NK_WARNINGS_AS_ERRORS)
         target_compile_options(nk_options INTERFACE /WX)
     endif()
 else()
     # clang（Linux・Android）
     target_compile_options(nk_options INTERFACE
-        -Wall -Wextra -Wpedantic -Wshadow -Wstrict-prototypes -Wmissing-prototypes
-    )
-
+        -Wall -Wextra -Wpedantic -Wshadow -Wstrict-prototypes -Wmissing-prototypes)
     if(NK_WARNINGS_AS_ERRORS)
         target_compile_options(nk_options INTERFACE -Werror)
     endif()
@@ -38,34 +39,88 @@ endif()
 
 if(NK_ENABLE_SANITIZERS)
     target_compile_options(nk_options INTERFACE
-        -fsanitize=address,undefined
-        -fno-sanitize-recover=undefined
-        -fno-omit-frame-pointer
-    )
-
-    target_link_options(nk_options INTERFACE
-        -fsanitize=address,undefined
-    )
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(nk_options INTERFACE -fsanitize=address,undefined)
 endif()
 
 if(ANDROID)
-    # Google Play の 16KB ページサイズ要件への対応
-    target_link_options(nk_options INTERFACE
-        "LINKER:-z,max-page-size=16384"
-    )
+    # Google Play の 16KB ページサイズ要件への対応。
+    # NDK r28 以降は既定でこの設定になるが、古い NDK で誤ってビルドしたときの保険として明示する
+    target_link_options(nk_options INTERFACE "LINKER:-z,max-page-size=16384")
 endif()
 
 # ------------------------------------------------------------------
-# 外部ライブラリ
+# 外部ライブラリ（third_party に submodule を追加したら有効にする）
 # 注意点は third_party/README.md を参照
 # ------------------------------------------------------------------
-# add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
-# add_subdirectory(third_party/lvgl EXCLUDE_FROM_ALL)
+# 画面（SDL3＋LVGL）は、まず PC 版で動かす。
+# Android 版への組み込みは、android/ の Gradle プロジェクトを作るときに行う（SDL3 は共有ライブラリにする）
+if(NOT ANDROID AND NK_BUILD_PC_UI)
+    # SDL3：静的ライブラリにしてアプリに入れる（PC 版で DLL を置かずに起動できるように）
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+    set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+    set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT DEFINED SDL_UNIX_CONSOLE_BUILD)
+        # X11 も Wayland も入っていない環境（CI）では、ウィンドウなしの SDL にする。
+        # 単体テストは SDL を使わないので、ウィンドウなしでも動く
+        find_package(X11 QUIET)
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(NK_WAYLAND QUIET wayland-client)
+        endif()
+        if(NOT X11_FOUND AND NOT NK_WAYLAND_FOUND)
+            message(STATUS "X11 と Wayland が見つからないため、SDL をウィンドウなしでビルドします")
+            set(SDL_UNIX_CONSOLE_BUILD ON)
+        endif()
+    endif()
+    add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL SYSTEM)
 
+    # LVGL：third_party/lvgl/src の C ファイルを直接ビルドする。
+    # 同梱の CMake は C++・アセンブラ・ThorVG も有効にするため使わない。設定は src/ui/lv_conf.h
+    file(GLOB_RECURSE NK_LVGL_SOURCES CONFIGURE_DEPENDS
+         "${PROJECT_SOURCE_DIR}/third_party/lvgl/src/*.c")
+    add_library(lvgl STATIC ${NK_LVGL_SOURCES})
+    target_include_directories(lvgl SYSTEM PUBLIC "${PROJECT_SOURCE_DIR}/third_party/lvgl")
+    target_include_directories(lvgl PRIVATE "${PROJECT_SOURCE_DIR}/src/ui")
+    target_compile_definitions(lvgl PUBLIC LV_CONF_INCLUDE_SIMPLE LV_LVGL_H_INCLUDE_SIMPLE
+                                           LV_KCONFIG_IGNORE)
+    # LVGL は C11 にない関数（strnlen など）を使う。-std=c11 のままだと Linux（glibc）で
+    # 宣言されず、clang 16 以降はエラーになるため、LVGL だけ GNU 拡張つき（gnu11）でビルドする
+    set_target_properties(lvgl PROPERTIES C_EXTENSIONS ON)
+    if(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        target_compile_options(lvgl PRIVATE /W0 /utf-8)
+    else()
+        target_compile_options(lvgl PRIVATE -w)
+    endif()
+    if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+        # MSVC の cl では、LVGL の可変長引数のマクロに標準どおりのプリプロセッサが要る
+        target_compile_options(lvgl PUBLIC /Zc:preprocessor)
+    endif()
+    if(UNIX)
+        target_link_libraries(lvgl PUBLIC m)
+    endif()
+endif()
+
+# ------------------------------------------------------------------
+# コンポーネント（実装を始めたら追加する）
+# 各コンポーネントは静的ライブラリ nk_<名前> として定義し、nk_options をリンクする
+# ------------------------------------------------------------------
 add_subdirectory(src/common)
+# data：データベース（SQLite）と同意・睡眠記録。画面を使わないので Android 版でもビルドする
 add_subdirectory(src/data)
 add_subdirectory(src/sensing)
 add_subdirectory(src/session)
+if(NOT ANDROID AND NK_BUILD_PC_UI)
+    add_subdirectory(src/ui)
+    add_subdirectory(src/app)
+    # 初回起動の同意と権限の画面（UX-1・Issue #28）を、単独で動かして確かめる PC 版
+endif()
+if(NOT ANDROID)
+    add_subdirectory(platform/pc)
+endif()
 
 # Androidアプリの起動用ライブラリ
 if(ANDROID)
@@ -106,168 +161,5 @@ endif()
 # ------------------------------------------------------------------
 if(NK_BUILD_TESTS AND NOT ANDROID)
     enable_testing()
-
-    add_subdirectory(platform/pc)
-
-    add_library(nk_unity STATIC
-        third_party/Unity/src/unity.c
-    )
-
-    target_include_directories(nk_unity PUBLIC
-        "${CMAKE_CURRENT_SOURCE_DIR}/third_party/Unity/src"
-    )
-
-    if(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-        target_compile_definitions(nk_unity PUBLIC
-            UNITY_NORETURN=_Noreturn
-        )
-    endif()
-
-    add_executable(nk_sqlcipher_check
-        tests/unit/sqlcipher_check.c
-    )
-
-    target_link_libraries(nk_sqlcipher_check PRIVATE
-        nk_data
-    )
-
-    add_test(
-        NAME sqlcipher_check
-        COMMAND nk_sqlcipher_check
-    )
-
-    add_executable(nk_data_check
-        tests/unit/data_check.c
-    )
-
-    target_link_libraries(nk_data_check PRIVATE
-        nk_data
-    )
-
-    add_test(
-        NAME data_encryption
-        COMMAND nk_data_check
-    )
-
-    add_executable(nk_session_check
-        tests/unit/session_check.c
-    )
-
-    target_link_libraries(nk_session_check PRIVATE
-        nk_session
-    )
-
-    add_test(
-        NAME session_consent
-        COMMAND nk_session_check
-    )
-
-    add_executable(nk_session_unity_check
-        tests/unit/session_unity_check.c
-    )
-
-    target_link_libraries(nk_session_unity_check PRIVATE
-        nk_session
-        nk_unity
-    )
-
-    add_test(
-        NAME session_unity
-        COMMAND nk_session_unity_check
-    )
-
-    add_executable(test_sensing_replay
-        tests/test_sensing_replay.c
-    )
-
-    target_link_libraries(test_sensing_replay PRIVATE
-        nk_replay
-        nk_unity
-        nk_options
-    )
-
-    add_test(
-        NAME sensing_replay
-        COMMAND test_sensing_replay
-    )
-
-    set_tests_properties(sensing_replay PROPERTIES
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    )
-
-    add_executable(nk_wav_reader_check
-        tests/unit/wav_reader_check.c
-    )
-
-    target_link_libraries(nk_wav_reader_check PRIVATE
-        nk_replay
-        nk_unity
-        nk_options
-    )
-
-    add_test(
-        NAME wav_reader
-        COMMAND nk_wav_reader_check
-    )
-
-    set_tests_properties(wav_reader PROPERTIES
-        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    )
-
-    option(NK_ENABLE_LOCAL_WAV_TESTS
-        "Enable replay tests using a local recording"
-        OFF
-    )
-
-    if(NK_ENABLE_LOCAL_WAV_TESTS)
-        add_executable(test_wav_sensing_replay
-            tests/test_wav_sensing_replay.c
-        )
-
-        target_link_libraries(test_wav_sensing_replay PRIVATE
-            nk_replay
-            nk_unity
-            nk_options
-        )
-
-        add_test(
-            NAME wav_sensing_replay
-            COMMAND test_wav_sensing_replay
-        )
-
-        set_tests_properties(wav_sensing_replay PROPERTIES
-            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        )
-    endif() # NK_ENABLE_LOCAL_WAV_TESTS
-
-    add_executable(nk_accel_features_check
-        tests/unit/accel_features_check.c
-    )
-
-    target_link_libraries(nk_accel_features_check PRIVATE
-        nk_unity
-        nk_sensing
-        nk_options
-    )
-
-    add_test(
-        NAME accel_features
-        COMMAND nk_accel_features_check
-    )
-
-    add_executable(nk_data_recovery_check
-        tests/unit/data_recovery_check.c
-    )
-
-    target_link_libraries(nk_data_recovery_check PRIVATE
-        nk_data
-        nk_unity
-        nk_options
-    )
-
-    add_test(
-        NAME data_recovery
-        COMMAND nk_data_recovery_check
-    )
-
-endif() # NK_BUILD_TESTS AND NOT ANDROID
+    add_subdirectory(tests)
+endif()

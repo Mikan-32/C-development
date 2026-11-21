@@ -129,6 +129,7 @@ static void *read_accelerometer(void *unused) {
     int64_t start_ms = 0;
     int64_t origin_ns = 0;
     int64_t last_timestamp = -1;
+    int64_t next_consent_check_ns = 0;
     uint64_t total = 0;
     uint64_t late_samples = 0;
     uint64_t invalid_samples = 0;
@@ -184,6 +185,22 @@ static void *read_accelerometer(void *unused) {
         ASensorEvent events[32];
         ssize_t received = 0;
         int64_t now_ns;
+        if (boot_time_ns(&now_ns) != NK_OK) {
+            failed = true;
+            break;
+        }
+        if (now_ns >= next_consent_check_ns) {
+            nk_result consent = nk_android_recording_check_consent(context.recording);
+            if (consent != NK_OK) {
+                failed = consent != NK_ERROR_CONSENT_REQUIRED;
+                atomic_store(&stop_reason, NK_SESSION_END_USER_STOP);
+                (void)__android_log_print(ANDROID_LOG_INFO, NK_ACCEL_TAG,
+                                          "Consent check stopped recording: result=%d",
+                                          (int)consent);
+                break;
+            }
+            next_consent_check_ns = now_ns + NK_ACC_NS;
+        }
         int poll_result = ALooper_pollOnce(NK_ACCEL_POLL_MS, NULL, NULL, NULL);
 
         if (poll_result == ALOOPER_POLL_ERROR) {

@@ -164,6 +164,14 @@ nk_result nk_data_consent_set(nk_data *data, const nk_consent_record *consent);
  */
 nk_result nk_data_has_measurement_consent(nk_data *data, int *out_has_consent);
 
+/* Application policy: only the latest active consent for this exact version counts. */
+nk_result nk_data_has_versioned_consent(nk_data *data, const char *version, int *out_agreed);
+nk_result nk_data_revoke_consent(nk_data *data, int64_t revoked_ms);
+
+/* Delete session/epoch/event atomically; unfinished recordings are rejected. */
+nk_result nk_data_delete_session(nk_data *data, int64_t session_id);
+nk_result nk_data_delete_all_sessions(nk_data *data);
+
 /*
  * sessionの開始情報を保存する。
  * 成功時に作成されたIDを*out_session_idへ格納する。

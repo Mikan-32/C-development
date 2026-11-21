@@ -257,6 +257,20 @@ static void test_persisted_user_stop_does_not_become_a_crash_gap(void) {
     TEST_ASSERT_EQUAL_INT(1, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1", id));
 }
 
+static void test_persisted_consent_revoke_does_not_become_a_crash_gap(void) {
+    int64_t id = seed_session(BASE_MS, 540, 0);
+    seed_epoch(id, 0, 0.99);
+    seed_epoch(id, 1, 0.5);
+    seed_event(id, NK_EVENT_USER, BASE_MS + 45000, 0, "CONSENT_REVOKED");
+    nk_data_recovery_report report = recover(BASE_MS + 300000);
+    TEST_ASSERT_EQUAL_INT(1, report.completed_user_stops);
+    TEST_ASSERT_EQUAL_INT(0, report.interrupted_sessions);
+    TEST_ASSERT_EQUAL_INT(0, report.added_epochs);
+    TEST_ASSERT_TRUE(scalar("SELECT end_ms FROM session WHERE id=?1", id) == BASE_MS + 45000);
+    TEST_ASSERT_EQUAL_INT(1, scalar("SELECT end_reason='USER_STOP' FROM session WHERE id=?1", id));
+    TEST_ASSERT_EQUAL_INT(1, scalar("SELECT COUNT(*) FROM event WHERE session_id=?1", id));
+}
+
 static void test_recovery_is_capped_at_fourteen_hours(void) {
     int64_t id = seed_session(BASE_MS, -480, 0);
     (void)recover(BASE_MS + INT64_C(86400000));
@@ -364,6 +378,7 @@ int main(void) {
     RUN_TEST(test_trailing_missing_epochs_without_a_marker_are_included);
     RUN_TEST(test_open_microphone_gap_is_closed_before_process_gap);
     RUN_TEST(test_persisted_user_stop_does_not_become_a_crash_gap);
+    RUN_TEST(test_persisted_consent_revoke_does_not_become_a_crash_gap);
     RUN_TEST(test_recovery_is_capped_at_fourteen_hours);
     RUN_TEST(test_multiple_sessions_are_recovered_in_one_transaction);
     RUN_TEST(test_failure_rolls_back_other_recovered_sessions_too);

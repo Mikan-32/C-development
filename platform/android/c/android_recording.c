@@ -3,6 +3,7 @@
 #include "android_recording.h"
 
 #include "android_bridge.h"
+#include "data_consent.h"
 #include "session.h"
 
 #include <SDL3/SDL.h>
@@ -27,6 +28,7 @@ struct nk_android_recording {
     int saved_epochs;
     int saved_events;
     int stop_event_saved;
+    int consent_revoked;
     nk_result finish_result;
     int finished;
 };
@@ -156,7 +158,8 @@ nk_result nk_android_recording_open(nk_android_recording **out_recording) {
     if (result != NK_OK) {
         goto cleanup;
     }
-    result = nk_data_has_measurement_consent(recording->data, &has_consent);
+    result = nk_data_has_versioned_consent(recording->data, NK_DATA_CONSENT_CURRENT_VERSION_TEXT,
+                                           &has_consent);
     if (result != NK_OK) {
         goto cleanup;
     }
@@ -172,6 +175,23 @@ cleanup:
         log_error(recording, "open", result);
     }
     return result;
+}
+
+nk_result nk_android_recording_check_consent(nk_android_recording *recording) {
+    if (recording == NULL) {
+        return NK_ERROR_ARGUMENT;
+    }
+    int agreed = 0;
+    nk_result result = nk_data_has_versioned_consent(recording->data,
+                                                     NK_DATA_CONSENT_CURRENT_VERSION_TEXT, &agreed);
+    if (result != NK_OK) {
+        return result;
+    }
+    if (!agreed) {
+        recording->consent_revoked = 1;
+        return NK_ERROR_CONSENT_REQUIRED;
+    }
+    return NK_OK;
 }
 
 nk_result nk_android_recording_start(nk_android_recording *recording, int64_t start_ms) {
@@ -191,6 +211,11 @@ nk_result nk_android_recording_start(nk_android_recording *recording, int64_t st
     if (recording->sensing != NULL || nk_session_is_running(recording->session)) {
         return NK_ERROR_ALREADY_RUNNING;
     }
+    result = nk_android_recording_check_consent(recording);
+    if (result != NK_OK) {
+        return result;
+    }
+    recording->consent_revoked = 0;
     result = local_date(start_ms, date, &record.tz_min);
     if (result != NK_OK) {
         return result;
@@ -374,7 +399,14 @@ nk_result nk_android_recording_finish(nk_android_recording *recording, int64_t e
     if (next != NK_OK) {
         return next;
     }
+    nk_result consent_result = nk_android_recording_check_consent(recording);
+    if (consent_result != NK_OK && consent_result != NK_ERROR_CONSENT_REQUIRED) {
+        reason = NK_SESSION_END_ERROR;
+    }
     result = nk_sensing_finish(recording->sensing);
+    if (result == NK_OK && consent_result != NK_OK && consent_result != NK_ERROR_CONSENT_REQUIRED) {
+        result = consent_result;
+    }
     if (result != NK_OK) {
         reason = NK_SESSION_END_ERROR;
     }
@@ -382,7 +414,7 @@ nk_result nk_android_recording_finish(nk_android_recording *recording, int64_t e
         nk_event_record event = {0};
         event.type = NK_EVENT_USER;
         event.t_ms = end_ms;
-        event.reason = "USER_STOP";
+        event.reason = recording->consent_revoked ? "CONSENT_REVOKED" : "USER_STOP";
         next = save_event(recording, &event);
         if (next != NK_OK) {
             result = next;
