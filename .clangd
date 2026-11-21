@@ -8,3 +8,18 @@ If:
     - third_party/SDL/include/.*
 CompileFlags:
   CompilationDatabase: build/android-core-arm64
+
+---
+If:
+  PathMatch: tests/unit/data/test_recording_consent\.c
+CompileFlags:
+  CompilationDatabase: build/android-core-arm64
+  Add:
+    - -I../../platform/android/c
+    - -I../../third_party/Unity/src
+    - -I../../third_party/SDL/include
+    - -I../../src/common
+    - -I../../src/data
+    - -I../../src/sensing
+    - -I../../src/session
+    - -Isrc/data/generated-sqlcipher
