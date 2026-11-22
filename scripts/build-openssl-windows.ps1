@@ -33,15 +33,15 @@ if ($env:VSCMD_ARG_TGT_ARCH -notin @("x64", "amd64")) {
 }
 
 $clExecutable = (
-    Get-Command cl.exe -CommandType Application -ErrorAction Stop
+    Get-Command cl.exe -TotalCount 1 -CommandType Application -ErrorAction Stop
 ).Source
 
 $nmakeExecutable = (
-    Get-Command nmake.exe -CommandType Application -ErrorAction Stop
+    Get-Command nmake.exe -TotalCount 1 -CommandType Application -ErrorAction Stop
 ).Source
 
 $tarExecutable = (
-    Get-Command tar.exe -CommandType Application -ErrorAction Stop
+    Get-Command tar.exe -TotalCount 1 -CommandType Application -ErrorAction Stop
 ).Source
 
 $perlExecutable = (
@@ -102,12 +102,12 @@ $installDirectory = Join-Path $repositoryRoot (
 )
 
 foreach ($directory in @(
-    $sourceParent,
-    $buildDirectory,
-    $installDirectory
-)) {
+        $sourceParent,
+        $buildDirectory,
+        $installDirectory
+    )) {
     New-Item -ItemType Directory -Path $directory -Force |
-        Out-Null
+    Out-Null
 }
 
 Write-Host "Extracting OpenSSL $opensslVersion ..."
@@ -172,10 +172,10 @@ try {
     $includeDirectory = Join-Path $installDirectory "include"
 
     foreach ($requiredFile in @(
-        $cryptoLibrary,
-        $sslLibrary,
-        (Join-Path $includeDirectory "openssl\opensslv.h")
-    )) {
+            $cryptoLibrary,
+            $sslLibrary,
+            (Join-Path $includeDirectory "openssl\opensslv.h")
+        )) {
         if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
             throw "Required file was not produced: $requiredFile"
         }
@@ -251,26 +251,26 @@ int main(void)
     ) -Force
 
     $buildInfo = [ordered]@{
-        schema_version = 1
+        schema_version  = 1
         openssl_version = $opensslVersion
-        source_sha256 = [string]$manifest.openssl.source_sha256
-        configuration = $configurationName
-        architecture = "x64"
-        runtime = $runtimeFlag.Substring(1)
-        static = $true
-        assembly = $false
-        crypto_sha256 = (
+        source_sha256   = [string]$manifest.openssl.source_sha256
+        configuration   = $configurationName
+        architecture    = "x64"
+        runtime         = $runtimeFlag.Substring(1)
+        static          = $true
+        assembly        = $false
+        crypto_sha256   = (
             Get-FileHash -LiteralPath $cryptoLibrary -Algorithm SHA256
         ).Hash.ToLowerInvariant()
-        ssl_sha256 = (
+        ssl_sha256      = (
             Get-FileHash -LiteralPath $sslLibrary -Algorithm SHA256
         ).Hash.ToLowerInvariant()
     }
 
     $buildInfo | ConvertTo-Json -Depth 4 |
-        Set-Content -LiteralPath (
-            Join-Path $installDirectory "build-info.json"
-        ) -Encoding ASCII
+    Set-Content -LiteralPath (
+        Join-Path $installDirectory "build-info.json"
+    ) -Encoding ASCII
 }
 finally {
     if ($locationPushed) {

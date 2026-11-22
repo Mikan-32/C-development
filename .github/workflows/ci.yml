@@ -56,7 +56,7 @@ jobs:
         if: steps.openssl-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          $perl = (Get-Command perl.exe -CommandType Application -ErrorAction Stop).Source
+          $perl = (Get-Command perl.exe -TotalCount 1 -CommandType Application -ErrorAction Stop).Source
           ./scripts/build-openssl-windows.ps1 -PerlPath $perl -Configuration Debug
       - name: SQLCipher の固定ソースから amalgamation を生成
         shell: cmd
