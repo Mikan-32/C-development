@@ -107,3 +107,34 @@ bool nk_data_session_delete_all(void) {
     }
     return rc == SQLITE_OK;
 }
+
+int nk_data_session_list(nk_sleep_session_t *out_list, int max_count) {
+    sqlite3 *db = nk_db_get_handle();
+    if (db == NULL || out_list == NULL || max_count <= 0) {
+        return -1;
+    }
+
+    const char *sql = "SELECT id, started_at, ended_at, sleep_score "
+                      "FROM sleep_sessions "
+                      "ORDER BY started_at DESC, id DESC "
+                      "LIMIT ?1;";
+
+    sqlite3_stmt *stmt = NULL;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        return -1;
+    }
+
+    sqlite3_bind_int(stmt, 1, max_count);
+
+    int count = 0;
+    while (count < max_count && sqlite3_step(stmt) == SQLITE_ROW) {
+        out_list[count].id = sqlite3_column_int64(stmt, 0);
+        out_list[count].started_at = sqlite3_column_int64(stmt, 1);
+        out_list[count].ended_at = sqlite3_column_int64(stmt, 2);
+        out_list[count].sleep_score = sqlite3_column_int(stmt, 3);
+        count++;
+    }
+
+    sqlite3_finalize(stmt);
+    return count;
+}
