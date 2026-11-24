@@ -1,26 +1,14 @@
-#pragma once
+#ifndef NK_DATA_SESSION_H
+#define NK_DATA_SESSION_H
 
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef struct {
-    int64_t id;
-    int64_t started_at;
-    int64_t ended_at;
-    int sleep_score;
-} nk_sleep_session_t;
-
-// 1晩分の睡眠セッションを保存し、採番されたIDを out_id に返す
-bool nk_data_session_insert(int64_t started_at, int64_t ended_at, int sleep_score, int64_t *out_id);
-
-// 保存されている睡眠セッションの総件数を取得（エラー時は -1）
+/* History refers to finished AI-1 session rows written by the acquisition code.
+ * Use data.h/session.h for insertion. Scores belong to the analysis component. */
 int nk_data_session_count(void);
-
-// 指定したIDが存在するか確認
 bool nk_data_session_exists(int64_t session_id);
-
-// 【Issue #28 完了条件】1夜の削除（指定したIDの履歴を1件削除）
 bool nk_data_session_delete_by_id(int64_t session_id);
-
-// 【Issue #28 完了条件】全削除（すべての履歴を削除）
 bool nk_data_session_delete_all(void);
+
+#endif

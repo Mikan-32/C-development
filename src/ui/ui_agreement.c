@@ -6,6 +6,7 @@
 static lv_obj_t *s_screen_obj = NULL;
 static lv_obj_t *s_next_btn = NULL;
 static lv_obj_t *s_agree_checkbox = NULL;
+static lv_obj_t *s_save_error = NULL;
 static nk_ui_agreement_on_next_cb s_on_next_cb = NULL;
 
 static void on_checkbox_changed(lv_event_t *e) {
@@ -21,7 +22,13 @@ static void on_checkbox_changed(lv_event_t *e) {
 
 static void on_next_clicked(lv_event_t *e) {
     (void)e;
-    nk_data_consent_set_agreed(true, NK_DATA_CONSENT_CURRENT_VERSION);
+    if (!nk_ui_agreement_is_checked() ||
+        !nk_data_consent_set_agreed(true, NK_DATA_CONSENT_CURRENT_VERSION)) {
+        if (s_save_error != NULL) {
+            lv_label_set_text(s_save_error, "同意を保存できませんでした。もう一度お試しください。");
+        }
+        return;
+    }
     if (s_on_next_cb != NULL) {
         s_on_next_cb();
     }
@@ -57,7 +64,8 @@ void nk_ui_agreement_create(nk_ui_agreement_on_next_cb on_next, bool is_reagreem
 
     // チェックボックス
     s_agree_checkbox = lv_checkbox_create(s_screen_obj);
-    lv_checkbox_set_text(s_agree_checkbox, "利用規約とプライバシーポリシーに同意する (v1)");
+    lv_checkbox_set_text(s_agree_checkbox, "利用規約とプライバシー\nポリシーに同意する (v1)");
+    lv_obj_set_width(s_agree_checkbox, 300);
     lv_obj_align(s_agree_checkbox, LV_ALIGN_CENTER, 0, 20);
     lv_obj_add_event_cb(s_agree_checkbox, on_checkbox_changed, LV_EVENT_VALUE_CHANGED, NULL);
 
@@ -72,6 +80,12 @@ void nk_ui_agreement_create(nk_ui_agreement_on_next_cb on_next, bool is_reagreem
     lv_label_set_text(btn_label, "同意して次へ");
     lv_obj_center(btn_label);
 
+    s_save_error = lv_label_create(s_screen_obj);
+    lv_obj_set_width(s_save_error, 300);
+    lv_label_set_long_mode(s_save_error, LV_LABEL_LONG_WRAP);
+    lv_label_set_text(s_save_error, "");
+    lv_obj_align(s_save_error, LV_ALIGN_BOTTOM_MID, 0, -105);
+
     lv_scr_load(s_screen_obj);
 }
 
@@ -81,6 +95,7 @@ void nk_ui_agreement_destroy(void) {
         s_screen_obj = NULL;
         s_next_btn = NULL;
         s_agree_checkbox = NULL;
+        s_save_error = NULL;
     }
 }
 

@@ -10,11 +10,16 @@ static nk_ui_privacy_on_revoke_cb s_on_revoke_cb = NULL;
 
 static void on_revoke_clicked(lv_event_t *e) {
     (void)e;
-    nk_data_consent_set_agreed(false, 0);
+    if (!nk_data_consent_set_agreed(false, 0)) {
+        if (s_status_label != NULL) {
+            lv_label_set_text(s_status_label, "同意の取り消しを保存できませんでした。");
+        }
+        return;
+    }
 
     if (s_status_label != NULL) {
         lv_label_set_text(s_status_label, "同意を取り消しました。\n"
-                                          "睡眠計測を停止しました。\n"
+                                          "新しい計測は開始できません。\n"
                                           "下のボタンから保存データを削除できます。");
     }
 
@@ -27,8 +32,11 @@ static void on_delete_all_clicked(lv_event_t *e) {
     (void)e;
     if (nk_data_session_delete_all()) {
         if (s_status_label != NULL) {
-            lv_label_set_text(s_status_label, "すべての睡眠履歴データを完全に削除しました。");
+            lv_label_set_text(s_status_label, "睡眠記録を削除しました。");
         }
+    } else if (s_status_label != NULL) {
+        lv_label_set_text(s_status_label,
+                          "削除できませんでした。\n計測が停止していることを確認してください。");
     }
 }
 
@@ -67,7 +75,7 @@ void nk_ui_privacy_create(nk_ui_privacy_on_revoke_cb on_revoke) {
     lv_obj_add_event_cb(del_btn, on_delete_all_clicked, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *del_lbl = lv_label_create(del_btn);
-    lv_label_set_text(del_lbl, "全データを削除する");
+    lv_label_set_text(del_lbl, "睡眠記録をすべて削除する");
     lv_obj_center(del_lbl);
 
     lv_scr_load(s_screen_obj);

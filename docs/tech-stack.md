@@ -11,7 +11,7 @@
 | 画面・タッチ・音の再生 | SDL3 | release-3.4.18 | Android 用の Java 部分（SDLActivity）は、SDL 本体と同じ版のものを使う |
 | GUI 部品 | LVGL | v9.6.0 | 非推奨 API は使わない（v10 で削除されるため） |
 | データ保存 | SQLCipher | v4.19.0 | 暗号化キーは Android Keystore で守る（プラットフォーム層の担当） |
-| 暗号・TLS | OpenSSL | 未定 | SQLCipher と libcurl で共用する。ビルド方法は third_party/README.md を参照 |
+| 暗号・TLS | OpenSSL | 3.5.9（Windows/Android）、配布元の3.x（Linux） | 版・ソースハッシュは cmake/dependencies.json。ビルド方法は third_party/README.md を参照 |
 | 通信 | libcurl ＋ cJSON | curl-8_23_0 / v1.7.19 | スマートカーテンのクラウド API 用 |
 | マイク・センサー | Android NDK（AAudio・ASensorManager） | NDK r28 以降 | 呼び出すのは `src/sensing/` だけ |
 | 日本語フォント | Noto Sans JP | — | 使う文字だけにサブセットして同梱する（SIL OFL） |

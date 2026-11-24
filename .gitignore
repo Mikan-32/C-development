@@ -36,3 +36,10 @@ captures/
 *.pem
 .env
 secrets.*
+
+# Generated dependency files
+/third_party/prebuilt/
+
+# Local PC demonstration databases
+/nemunoki_pc_encrypted.db*
+/nemunoki_dev.db*

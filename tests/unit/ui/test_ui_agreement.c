@@ -1,7 +1,9 @@
 #include "data_consent.h"
 #include "lvgl.h"
+#include "nk_db.h"
 #include "ui_agreement.h"
 #include "ui_permissions.h"
+#include "ui_privacy_settings.h"
 #include "unity.h"
 
 static lv_display_t *s_disp = NULL;
@@ -12,6 +14,7 @@ static void dummy_on_next(void) {
 }
 
 void setUp(void) {
+    TEST_ASSERT_EQUAL_INT(SQLITE_OK, nk_db_open(":memory:", "ui-test-key", 11));
     lv_init();
     s_disp = lv_display_create(360, 640);
     s_next_called = false;
@@ -21,10 +24,12 @@ void setUp(void) {
 void tearDown(void) {
     nk_ui_agreement_destroy();
     nk_ui_permissions_destroy();
+    nk_ui_privacy_destroy();
     if (s_disp != NULL) {
         lv_display_delete(s_disp);
         s_disp = NULL;
     }
+    nk_db_close();
 }
 
 static void test_nk_ui_agreement_flow(void) {
@@ -61,9 +66,30 @@ static void test_nk_ui_permissions_mic_denied_shows_warning(void) {
     TEST_ASSERT_TRUE(nk_ui_permissions_is_done_enabled());
 }
 
+static void test_agreement_does_not_advance_when_persistence_fails(void) {
+    nk_ui_agreement_create(dummy_on_next, false);
+    nk_ui_agreement_toggle_checkbox();
+    nk_db_close();
+    nk_ui_agreement_click_next();
+    TEST_ASSERT_FALSE(s_next_called);
+    TEST_ASSERT_FALSE(nk_data_consent_is_agreed());
+}
+
+static void test_privacy_revoke_changes_the_acquisition_consent(void) {
+    TEST_ASSERT_TRUE(nk_data_consent_set_agreed(true, NK_DATA_CONSENT_CURRENT_VERSION));
+    nk_ui_privacy_create(dummy_on_next);
+    nk_ui_privacy_click_revoke();
+    int agreed = 1;
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_has_measurement_consent(nk_db_get_data(), &agreed));
+    TEST_ASSERT_EQUAL_INT(0, agreed);
+    TEST_ASSERT_TRUE(s_next_called);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_nk_ui_agreement_flow);
+    RUN_TEST(test_agreement_does_not_advance_when_persistence_fails);
+    RUN_TEST(test_privacy_revoke_changes_the_acquisition_consent);
     RUN_TEST(test_nk_ui_permissions_mic_denied_shows_warning);
     return UNITY_END();
 }
