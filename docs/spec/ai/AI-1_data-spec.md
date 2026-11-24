@@ -3,6 +3,7 @@
 - 状態：提案（ADR-0005・0007 と同時にレビュー）
 - 使う人：`sensing/`（作る側）、`session/`・`data/`（保存する側）、`analysis/`（読む側）
 - PRD：4.1、5.2
+- 実装との照合：CS-2（#27、PR #66）の表の定義と照らし合わせた（2026-11-24）。結果は 11 章
 
 ## 1. データの流れ
 
@@ -19,7 +20,7 @@
 
 | 入力 | 取り方 | 単位 | 必須 | 取れないとき |
 |---|---|---|---|---|
-| 加速度 | `ASENSOR_TYPE_ACCELEROMETER`、間隔 20,000 µs、まとめ受け取り最大 10 秒 | m/s² | 必須 | 計測を始めない（Q02） |
+| 加速度 | `ASENSOR_TYPE_ACCELEROMETER`、間隔 20,000 µs、まとめ受け取り最大 10 秒 | m/s² | 必須 | 計測を始めない（Q02）。セッションは保存しない |
 | マイク | AAudio 入力、16,000 Hz、モノラル、16bit、入力の種類は音声認識用（加工が少ない） | dBFS に変換 | 任意 | いびき・呼吸音なしで計測を続ける（Q01、Q08） |
 | 照度 | `ASENSOR_TYPE_LIGHT`、変化時 | lx | 任意 | 照度なしで続ける |
 | 電池 | 開始時と終了時に `SDL_GetPowerInfo` | %、充電中か | 任意 | 空欄 |
@@ -77,29 +78,44 @@
 | `TURN` | 寝返り（姿勢の変化） | 変化した角度 | — |
 | `SNORE` | いびきの続いた区間（10 秒以上） | 平均の大きさ dBFS | — |
 | `NOISE` | 大きな音（周囲より 15 dB 以上大きい） | 大きさ dBFS | — |
-| `GAP_START` / `GAP_END` | 取得できなかった区間 | — | 理由コード（AI-2 の表） |
+| `GAP_START` / `GAP_END` | 取得できなかった区間 | — | 理由コード（AI-2 の表）。加速度の欠損は `Q04`、マイクの欠損・使用中は `Q08` |
 | `SOUND_START` / `SOUND_STOP` | 入眠サウンド | 音源の番号 | — |
 | `CURTAIN` | カーテンの命令と結果 | 目標位置 | 結果（成功・失敗・未確認） |
 | `ALARM` | 鳴動・スヌーズ・停止 | スヌーズ回数 | — |
-| `USER` | 「起きた」「計測を止めた」 | — | — |
+| `USER` | 「起きた」「計測を止めた」 | — | `USER_STOP`（ユーザーが止めた）、`CONSENT_REVOKED`（同意の取り消しで止めた） |
 
-列：`session_id`、`t_ms`（UTC ミリ秒）、`dur_ms`、`type`、`value`、`reason`。
+| 列 | 型 | 欠損 | 説明 |
+|---|---|---|---|
+| `id` | INTEGER | 不可 | 主キー |
+| `session_id` | INTEGER | 不可 | |
+| `t_ms` | INTEGER | 不可 | UTC ミリ秒。`GAP_END` は区間の終わりの時刻 |
+| `dur_ms` | INTEGER | 不可 | 長さ（ミリ秒）。`GAP_END` は欠損した区間の長さで、区間の始まりは `t_ms − dur_ms` |
+| `type` | TEXT | 不可 | 上の表 |
+| `value` | REAL | NULL | 上の表 |
+| `reason` | TEXT | NULL | 上の表 |
+
+`(session_id, t_ms)` に索引を付ける。
 
 ## 6. セッション（1 夜・保存する）
 
 テーブル `session`。
 
-| 列 | 説明 |
-|---|---|
-| `id`、`start_ms`、`end_ms`、`tz_min` | 開始・終了（UTC ミリ秒）と、開始時のタイムゾーンのずれ（分） |
-| `night_date` | 起床日（`end_ms` の現地日付、`YYYY-MM-DD`） |
-| `end_reason` | `USER_STOP`、`ALARM_STOP`、`TIMEOUT_14H`、`SERVICE_KILLED`、`BATTERY_LOW`、`ERROR` |
-| `target_sleep_min` | その夜の目標睡眠時間（既定 420 分） |
-| `alarm_ms` | その夜のアラーム時刻（なければ NULL） |
-| `mic_used`、`light_used` | 使ったセンサー |
-| `placement` | 試し計測の結果 `OK`／`WARN`／`SKIP` |
-| `battery_start`、`battery_end` | % |
-| `app_ver`、`algo_ver`、`device_model` | 版と端末 |
+| 列 | 型 | 欠損 | 説明 |
+|---|---|---|---|
+| `id` | INTEGER | 不可 | 主キー |
+| `start_ms`、`tz_min` | INTEGER | 不可 | 開始（UTC ミリ秒）と、開始時のタイムゾーンのずれ（分） |
+| `end_ms` | INTEGER | 計測中は NULL | 終了（UTC ミリ秒） |
+| `night_date` | TEXT | 計測中は NULL | 起床日（`end_ms` の現地日付、`YYYY-MM-DD`） |
+| `end_reason` | TEXT | 計測中は NULL | `USER_STOP`、`ALARM_STOP`、`TIMEOUT_14H`、`SERVICE_KILLED`、`BATTERY_LOW`、`ERROR` |
+| `target_sleep_min` | INTEGER | 不可 | その夜の目標睡眠時間（既定 420 分） |
+| `alarm_ms` | INTEGER | NULL | その夜のアラーム時刻（なければ NULL） |
+| `mic_used`、`light_used` | INTEGER（0/1） | 不可 | 使ったセンサー |
+| `placement` | TEXT | NULL | 試し計測の結果 `OK`／`WARN`／`SKIP` |
+| `battery_start`、`battery_end` | INTEGER | NULL | % |
+| `app_ver`、`algo_ver` | TEXT | 不可 | 版 |
+| `device_model` | TEXT | NULL | 端末 |
+
+アプリが止められて `end_ms` が NULL のまま残った夜は、次に起動したときに閉じる。止める操作の記録（`USER` イベント）があれば `USER_STOP`、なければ `SERVICE_KILLED` にし、止まっていた時間のエポックを `acc_cov` = 0（測った値は NULL）の行で埋めて、`Q04` の欠損として残す。
 
 ## 7. 夜ごとの分析結果（保存する）
 
@@ -123,7 +139,7 @@
 
 | テーブル | 主な列 |
 |---|---|
-| `consent` | 同意文の版、同意した項目（計測、マイク、録音の保存）、日時、取り消し日時 |
+| `consent` | 同意文の版（`version`）、同意した項目（計測 `measurement`、マイク `microphone`、録音の保存）、日時（`consented_ms`）、取り消し日時（`revoked_ms`）。録音の保存の列は、`snore_clip` を作るときに足す |
 | `settings` | 目標睡眠時間、起きる時刻（平日・休日）、文字サイズ、サウンドの既定 |
 | `curtain` | デバイス ID、名前、トークンとシークレット（DB ごと暗号化）、開閉の予約 |
 | `automode` | 有効か、開ける何分前か、スキップの予定、一時停止の理由 |
@@ -141,3 +157,17 @@
 ## 10. PC で使うときの形式
 
 再生テスト（ADR-0011 の段 3）と評価（AI-7）では、上のエポックを 1 行ずつ並べた JSON を使う（`tests/golden/analysis/*.input.json`）。列名はこの表と同じにする。
+
+## 11. 実装との照合（CS-2）
+
+CS-2（#27、PR #66）の `src/data/data.c`・`data.h`、`src/sensing/`、`src/session/` と照らし合わせた結果。
+
+| 対象 | 結果 |
+|---|---|
+| エポック（4 章）の列名・型・欠損、`flags` のビット | 一致 |
+| しきい値（`acc_cov` < 0.8、`micro_mg` < 0.5 mg） | 一致 |
+| イベント（5 章）の `type` | 一致。`id` 列と索引、`USER` の `reason`、欠損の理由の分け方（`Q04`・`Q08`）は実装に合わせて 5 章に書き足した |
+| セッション（6 章）の列名・`end_reason` | 一致。型と、計測中に NULL になる列、途中で止まった夜の閉じ方を 6 章に書き足した |
+| 同意（8 章） | 録音の保存の列がまだない。録音を作るときに足す |
+| `night_result` と、8 章のほかのテーブル | まだ実装がない（CS-4 以降で作る） |
+| DB の版 | `PRAGMA user_version = 1`。列を変えるときは版を上げる |
