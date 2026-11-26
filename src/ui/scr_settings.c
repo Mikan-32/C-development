@@ -36,12 +36,12 @@ static lv_obj_t *group(lv_obj_t *page, const char *title) {
 
 static const char *font_scale_label(void) {
     switch (nk_theme_get_font_scale()) {
+    default:
+        return "1.0倍（標準）";
     case NK_FONT_SCALE_120:
         return "1.2倍（大）";
     case NK_FONT_SCALE_140:
         return "1.4倍（特大）";
-    default:
-        return "1.0倍（標準）";
     }
 }
 
