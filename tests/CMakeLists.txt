@@ -8,7 +8,12 @@ endif()
 if(NK_BUILD_PC_UI)
 # ui：すべての画面を、ウィンドウなしで作って描けるか（落ちないか）と、戻る先を確かめる
 add_executable(test_ui_screens unit/ui/test_ui_screens.c)
-target_link_libraries(test_ui_screens PRIVATE nk_ui nk_unity nk_options)
+target_link_libraries(test_ui_screens PRIVATE
+    nk_ui
+    nk_data
+    nk_unity
+    nk_options
+)
 add_test(NAME ui.screens COMMAND test_ui_screens)
 
 # ui：同意画面（ON-02）と権限画面（ON-03）の操作と表示

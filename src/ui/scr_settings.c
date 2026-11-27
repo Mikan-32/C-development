@@ -1,6 +1,7 @@
 /*
  * ST-01 設定と BR-01 寝室（UX-5 改訂版の図。寝室は設定の中に置いた仮の形）
  */
+#include "nk_widgets.h"
 #include "ui_internal.h"
 
 /* 設定の 1 行：名前（と説明）、右に値と「›」 */
@@ -33,6 +34,39 @@ static lv_obj_t *group(lv_obj_t *page, const char *title) {
     return card;
 }
 
+static const char *font_scale_label(void) {
+    switch (nk_theme_get_font_scale()) {
+    default:
+        return "1.0倍（標準）";
+    case NK_FONT_SCALE_120:
+        return "1.2倍（大）";
+    case NK_FONT_SCALE_140:
+        return "1.4倍（特大）";
+    }
+}
+
+static void on_font_scale_clicked(lv_event_t *e) {
+    (void)e;
+    nk_font_scale next = (nk_font_scale)(((int)nk_theme_get_font_scale() + 1) % 3);
+    nk_theme_set_font_scale(next);
+    nk_ui_open(NK_UI_SETTINGS);
+}
+
+static void on_privacy_clicked(lv_event_t *e) {
+    (void)e;
+    nk_open_privacy_modal();
+}
+
+static void on_about_analysis_clicked(lv_event_t *e) {
+    (void)e;
+    nk_open_help_st03();
+}
+
+static void on_license_clicked(lv_event_t *e) {
+    (void)e;
+    nk_open_license_modal();
+}
+
 void nk_build_settings(lv_obj_t *page) {
     nk_text(page, "設定", NK_FS_HEAD + 4, true, NK_INK);
 
@@ -44,9 +78,22 @@ void nk_build_settings(lv_obj_t *page) {
     item(sleep_goal, "起きる時刻", NULL, "平日 6:30・休日 8:00");
 
     lv_obj_t *other = group(page, "そのほか");
-    item(other, "データとプライバシー", "同意、マイクの許可、記録の削除", NULL);
-    item(other, "この分析について", NULL, NULL);
-    item(other, "ライセンス表示", NULL, NULL);
+    lv_obj_t *row_font = item(other, "文字の大きさ", "1.0／1.2／1.4 倍", font_scale_label());
+    lv_obj_set_clickable(row_font, true);
+    lv_obj_add_event_cb(row_font, on_font_scale_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *row_privacy =
+        item(other, "データとプライバシー", "同意、マイクの許可、記録の削除", NULL);
+    lv_obj_set_clickable(row_privacy, true);
+    lv_obj_add_event_cb(row_privacy, on_privacy_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *row_about = item(other, "この分析について", NULL, NULL);
+    lv_obj_set_clickable(row_about, true);
+    lv_obj_add_event_cb(row_about, on_about_analysis_clicked, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *row_license = item(other, "ライセンス表示", NULL, NULL);
+    lv_obj_set_clickable(row_license, true);
+    lv_obj_add_event_cb(row_license, on_license_clicked, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *version =
         nk_text(page, "ねむのき 0.1.0（画面の試作）", NK_FS_CAPTION, false, NK_INK_3);

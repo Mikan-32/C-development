@@ -1,6 +1,7 @@
 /*
  * 画面の土台：下部タブ、画面の切り替え、画面どうしで共有する部品
  */
+#include "nk_widgets.h"
 #include "ui_internal.h"
 
 #include <stdint.h>
@@ -74,6 +75,7 @@ void nk_ui_open(nk_ui_screen screen) {
     if ((int)screen < 0 || (int)screen >= (int)NK_UI_SCREEN_COUNT || s_ui.page == NULL) {
         return;
     }
+    nk_modal_close();
     s_ui.current = screen;
     lv_obj_clean(s_ui.page);
     lv_obj_scroll_to_y(s_ui.page, 0, LV_ANIM_OFF);
@@ -86,6 +88,10 @@ nk_ui_screen nk_ui_current(void) {
 }
 
 bool nk_ui_back(void) {
+    if (nk_modal_is_open()) {
+        nk_modal_close();
+        return true;
+    }
     if (s_ui.current == NK_UI_RECORD_DETAIL) {
         nk_ui_open(NK_UI_RECORD_DAY);
         return true;
@@ -318,7 +324,8 @@ lv_obj_t *nk_ring(lv_obj_t *parent, int32_t size, int32_t score) {
     lv_obj_set_style_arc_width(arc, 10, LV_PART_MAIN);
     lv_obj_set_style_arc_width(arc, 10, LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(arc, NK_CARD_2, LV_PART_MAIN);
-    lv_obj_set_style_arc_color(arc, score >= 70 ? NK_GOOD : NK_WARN, LV_PART_INDICATOR);
+    lv_color_t arc_col = (score >= 70) ? NK_GOOD : (score >= 55 ? NK_WARN : NK_SERIOUS);
+    lv_obj_set_style_arc_color(arc, arc_col, LV_PART_INDICATOR);
     char text[8];
     lv_snprintf(text, sizeof(text), "%d", (int)score);
     lv_obj_center(nk_text(arc, text, size / 3, true, NK_INK));

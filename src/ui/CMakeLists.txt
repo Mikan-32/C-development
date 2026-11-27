@@ -12,6 +12,10 @@ add_library(nk_ui STATIC
     ui_permissions.c
     ui_privacy_settings.c
     ui_font.c
+    nk_ui_store.c
+    nk_ui_store.h
+    nk_widgets.c
+    nk_widgets.h
 )
 target_include_directories(nk_ui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(nk_ui PUBLIC lvgl PRIVATE nk_data nk_options)
