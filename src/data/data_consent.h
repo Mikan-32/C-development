@@ -3,7 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define NK_DATA_CONSENT_CURRENT_VERSION 1U
+#define NK_DATA_CONSENT_CURRENT_VERSION      1U
+#define NK_DATA_CONSENT_CURRENT_VERSION_TEXT "1"
 
 // 同意データ管理の初期化（DBが開いていれば保存済み状態をロード）
 void nk_data_consent_init(void);

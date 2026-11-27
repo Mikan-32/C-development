@@ -8,6 +8,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(NK_BUILD_PC_UI "Build the SDL/LVGL PC applications" ON)
 option(NK_BUILD_TESTS "単体テスト（Unity）をビルドする" ON)
 option(NK_ENABLE_SANITIZERS "AddressSanitizer と UndefinedBehaviorSanitizer を有効にする（Linux の clang 用）" OFF)
 option(NK_WARNINGS_AS_ERRORS "警告をエラーとして扱う（CI では ON）" OFF)
@@ -54,7 +55,7 @@ endif()
 # ------------------------------------------------------------------
 # 画面（SDL3＋LVGL）は、まず PC 版で動かす。
 # Android 版への組み込みは、android/ の Gradle プロジェクトを作るときに行う（SDL3 は共有ライブラリにする）
-if(NOT ANDROID)
+if(NOT ANDROID AND NK_BUILD_PC_UI)
     # SDL3：静的ライブラリにしてアプリに入れる（PC 版で DLL を置かずに起動できるように）
     set(SDL_SHARED OFF CACHE BOOL "" FORCE)
     set(SDL_STATIC ON CACHE BOOL "" FORCE)
@@ -107,14 +108,53 @@ endif()
 # コンポーネント（実装を始めたら追加する）
 # 各コンポーネントは静的ライブラリ nk_<名前> として定義し、nk_options をリンクする
 # ------------------------------------------------------------------
-# add_subdirectory(src/common)
+add_subdirectory(src/common)
 # data：データベース（SQLite）と同意・睡眠記録。画面を使わないので Android 版でもビルドする
 add_subdirectory(src/data)
-if(NOT ANDROID)
+add_subdirectory(src/sensing)
+add_subdirectory(src/session)
+if(NOT ANDROID AND NK_BUILD_PC_UI)
     add_subdirectory(src/ui)
     add_subdirectory(src/app)
     # 初回起動の同意と権限の画面（UX-1・Issue #28）を、単独で動かして確かめる PC 版
+endif()
+if(NOT ANDROID)
     add_subdirectory(platform/pc)
+endif()
+
+# Androidアプリの起動用ライブラリ
+if(ANDROID)
+    set(SDL_SHARED ON CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+    set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+
+    add_subdirectory(third_party/SDL EXCLUDE_FROM_ALL)
+
+    # Android Studioの同期時に、生成前のPCHを参照しないようにする
+    set_property(TARGET SDL3-shared PROPERTY
+        DISABLE_PRECOMPILE_HEADERS ON
+    )
+
+    add_library(main SHARED
+        platform/android/c/android_main.c
+        platform/android/c/android_bridge.c
+        platform/android/c/android_consent.c
+        platform/android/c/android_night.c
+        platform/android/c/android_accel.c
+        platform/android/c/android_recording.c
+        platform/android/c/android_saved_report.c
+    )
+
+    target_link_libraries(main PRIVATE
+        SDL3::SDL3
+        nk_data
+        nk_session
+        nk_sensing
+        nk_options
+        android
+        log
+    )
 endif()
 
 # ------------------------------------------------------------------

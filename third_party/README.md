@@ -10,7 +10,7 @@
 | curl | `curl/` | `curl-8_23_0` | curl（MIT 系） | HTTPS 通信 |
 | cJSON | `cJSON/` | `v1.7.19` | MIT | JSON の読み書き |
 | Unity | `Unity/` | `v2.7.0` | MIT | C の単体テスト |
-| OpenSSL | 未定 | 未定 | Apache-2.0 | 暗号と TLS（SQLCipher と curl で共用） |
+| OpenSSL | `prebuilt/openssl/`（生成物） | 3.5.9（Windows/Android） | Apache-2.0 | 暗号と TLS。Linuxは配布元のOpenSSL 3.xを使用 |
 | Noto Sans JP | 未定（アセットとして同梱） | — | SIL OFL 1.1 | 日本語フォント |
 
 ## 追加のしかた（リポジトリ管理者が最初に 1 回だけ）

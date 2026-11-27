@@ -1,6 +1,7 @@
 package io.github.mikan32.nemunoki.platform
 
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -32,6 +33,15 @@ class MainActivity : SDLActivity() {
 
     override fun getLibraries(): Array<String> = NativeBridge.LIBRARIES
 
+    override fun getArguments(): Array<String> {
+        val isDebug = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        return if (isDebug && intent?.getBooleanExtra(EXTRA_TM02_REPORT_ONLY, false) == true) {
+            arrayOf("--tm02-report-only")
+        } else {
+            emptyArray()
+        }
+    }
+
     private fun handleLaunch(intent: Intent?) {
         if (intent == null) return
         val reason = intent.getIntExtra(EXTRA_REASON, NativeBridge.LAUNCH_NORMAL)
@@ -55,6 +65,7 @@ class MainActivity : SDLActivity() {
     }
 
     companion object {
+        private const val EXTRA_TM02_REPORT_ONLY = "io.github.mikan32.nemunoki.extra.TM02_REPORT_ONLY"
         internal const val EXTRA_REASON = "io.github.mikan32.nemunoki.extra.REASON"
         internal const val EXTRA_ID = "io.github.mikan32.nemunoki.extra.ID"
     }

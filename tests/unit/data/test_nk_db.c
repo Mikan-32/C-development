@@ -44,15 +44,28 @@ static void test_nk_db_rejects_wrong_key(void) {
     TEST_ASSERT_TRUE(nk_db_is_open());
 }
 
+static int64_t seed_finished(int64_t start_ms, int64_t end_ms) {
+    nk_session_record record = {0};
+    record.start_ms = start_ms;
+    record.target_sleep_min = 420;
+    record.app_ver = "db-test";
+    record.algo_ver = "unscored";
+    int64_t id = 0;
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_session_start(nk_db_get_data(), &record, &id));
+    TEST_ASSERT_EQUAL_INT(NK_OK, nk_data_session_finish(nk_db_get_data(), id, end_ms, "1970-01-01",
+                                                        NK_SESSION_END_USER_STOP, 0, 0));
+    return id;
+}
+
 // 3. 1夜の削除と全削除ができ、削除後に履歴から消えることを検証（Issue #28 完了条件）
 static void test_nk_data_session_delete_single_and_all(void) {
     const char *key = "session_test_key";
     TEST_ASSERT_EQUAL_INT(0, nk_db_open(":memory:", key, (int)strlen(key)));
 
     int64_t id1 = 0, id2 = 0, id3 = 0;
-    TEST_ASSERT_TRUE(nk_data_session_insert(1000, 2000, 85, &id1));
-    TEST_ASSERT_TRUE(nk_data_session_insert(3000, 4000, 72, &id2));
-    TEST_ASSERT_TRUE(nk_data_session_insert(5000, 6000, 91, &id3));
+    id1 = seed_finished(1000, 2000);
+    id2 = seed_finished(3000, 4000);
+    id3 = seed_finished(5000, 6000);
 
     TEST_ASSERT_EQUAL_INT(3, nk_data_session_count());
 

@@ -2,93 +2,81 @@
 
 #include "nk_db.h"
 
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
-static bool s_is_agreed = false;
-static uint32_t s_agreed_version = 0;
-
-void nk_data_consent_init(void) {
-    s_is_agreed = false;
-    s_agreed_version = 0;
-
-    sqlite3 *db = nk_db_get_handle();
-    if (db == NULL) {
-        return;
+static int64_t consent_time_ms(void) {
+    time_t now = time(NULL);
+    if (now < 0 || (uint64_t)now > INT64_MAX / 1000) {
+        return -1;
     }
-
-    const char *sql = "SELECT agreed_version FROM user_consent WHERE id = 1;";
-    sqlite3_stmt *stmt = NULL;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) == SQLITE_OK) {
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
-            uint32_t ver = (uint32_t)sqlite3_column_int(stmt, 0);
-            if (ver > 0) {
-                s_is_agreed = true;
-                s_agreed_version = ver;
-            }
-        }
-        sqlite3_finalize(stmt);
-    }
+    return (int64_t)now * 1000;
 }
 
-bool nk_data_consent_is_agreed(void) {
-    return s_is_agreed;
+void nk_data_consent_init(void) {
+    /* No process-local cache: another connection may revoke consent. */
 }
 
 uint32_t nk_data_consent_get_agreed_version(void) {
-    return s_agreed_version;
+    sqlite3 *db = nk_db_get_handle();
+    sqlite3_stmt *statement = NULL;
+    uint32_t version = 0;
+    if (db == NULL || sqlite3_prepare_v2(db,
+                                         "SELECT version FROM consent WHERE revoked_ms IS NULL "
+                                         "ORDER BY consented_ms DESC,id DESC LIMIT 1;",
+                                         -1, &statement, NULL) != SQLITE_OK) {
+        return 0;
+    }
+    if (sqlite3_step(statement) == SQLITE_ROW) {
+        const char *text = (const char *)sqlite3_column_text(statement, 0);
+        char *end = NULL;
+        errno = 0;
+        unsigned long long value = text != NULL ? strtoull(text, &end, 10) : 0;
+        if (text != NULL && text[0] >= '0' && text[0] <= '9' && end != text && *end == '\0' &&
+            errno == 0 && value > 0 && value <= UINT32_MAX) {
+            char canonical[16];
+            (void)snprintf(canonical, sizeof(canonical), "%u", (unsigned int)value);
+            if (strcmp(text, canonical) == 0) {
+                version = (uint32_t)value;
+            }
+        }
+    }
+    if (sqlite3_finalize(statement) != SQLITE_OK) {
+        return 0;
+    }
+    return version;
+}
+
+bool nk_data_consent_is_agreed(void) {
+    int agreed = 0;
+    return nk_data_consent_get_agreed_version() != 0 &&
+           nk_data_has_measurement_consent(nk_db_get_data(), &agreed) == NK_OK && agreed != 0;
 }
 
 bool nk_data_consent_needs_reagreement(uint32_t current_version) {
-    if (!s_is_agreed) {
-        return true;
-    }
-    return s_agreed_version < current_version;
+    return !nk_data_consent_is_agreed() || current_version == 0 ||
+           nk_data_consent_get_agreed_version() != current_version;
 }
 
 bool nk_data_consent_set_agreed(bool agreed, uint32_t version) {
-    uint32_t target_ver = agreed ? version : 0U;
-    s_is_agreed = agreed && (target_ver > 0U);
-    s_agreed_version = target_ver;
-
-    sqlite3 *db = nk_db_get_handle();
-    if (db == NULL) {
-        return true;
-    }
-
-    if (!s_is_agreed) {
-        char *err_msg = NULL;
-        int rc = sqlite3_exec(db, "DELETE FROM user_consent WHERE id = 1;", NULL, NULL, &err_msg);
-        if (err_msg != NULL) {
-            sqlite3_free(err_msg);
-        }
-        return rc == SQLITE_OK;
-    }
-
-    const char *sql = "INSERT INTO user_consent (id, agreed_version, agreed_at) "
-                      "VALUES (1, ?1, ?2) "
-                      "ON CONFLICT(id) DO UPDATE SET "
-                      "agreed_version = excluded.agreed_version, "
-                      "agreed_at = excluded.agreed_at;";
-
-    sqlite3_stmt *stmt = NULL;
-    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+    nk_data *data = nk_db_get_data();
+    int64_t now_ms = consent_time_ms();
+    if (data == NULL || now_ms < 0 || (agreed && version == 0)) {
         return false;
     }
-
-    sqlite3_bind_int(stmt, 1, (int)target_ver);
-    sqlite3_bind_int64(stmt, 2, (sqlite3_int64)time(NULL));
-
-    int rc = sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-    return rc == SQLITE_DONE;
+    if (!agreed) {
+        return nk_data_revoke_consent(data, now_ms) == NK_OK;
+    }
+    char version_text[16];
+    (void)snprintf(version_text, sizeof(version_text), "%u", (unsigned int)version);
+    nk_consent_record consent = {version_text, 1, 0, now_ms};
+    return nk_data_consent_set(data, &consent) == NK_OK;
 }
 
 void nk_data_consent_reset(void) {
-    s_is_agreed = false;
-    s_agreed_version = 0;
-
-    sqlite3 *db = nk_db_get_handle();
-    if (db != NULL) {
-        sqlite3_exec(db, "DELETE FROM user_consent WHERE id = 1;", NULL, NULL, NULL);
-    }
+    /* Test helper keeps the audit trail; it never removes consent history. */
+    (void)nk_data_consent_set_agreed(false, 0);
 }

@@ -5,7 +5,7 @@
   "clangd.arguments": [
     "--background-index",
     "--header-insertion=never",
-    "--compile-commands-dir=build/windows-clang"
+    "--enable-config"
   ],
   "editor.formatOnSave": true,
   "[c]": {

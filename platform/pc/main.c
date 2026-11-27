@@ -14,6 +14,8 @@
 
 #define WINDOW_WIDTH  390
 #define WINDOW_HEIGHT 844
+#define NK_PC_WINDOW_WIDTH  360
+#define NK_PC_WINDOW_HEIGHT 640
 
 static lv_display_t *s_disp = NULL;
 static lv_indev_t *s_mouse_indev = NULL;
@@ -65,6 +67,14 @@ static void switch_to_permissions_async(void *unused) {
 
 static void goto_permissions(void) {
     (void)lv_async_call(switch_to_permissions_async, NULL);
+static void goto_privacy_settings(void) {
+    nk_ui_privacy_create(NULL);
+    nk_ui_permissions_destroy();
+}
+
+static void goto_permissions(void) {
+    nk_ui_permissions_create(goto_privacy_settings, request_sdl3_permissions);
+    nk_ui_agreement_destroy();
 }
 
 static void flush_cb(lv_display_t *d, const lv_area_t *area, uint8_t *px_map) {
@@ -96,18 +106,31 @@ int main(int argc, char *argv[]) {
 
     // DB初期化と保存済み同意状態の読み込み
     const char *dev_key = "nemunoki_dev_key";
-    nk_db_open("nemunoki_dev.db", dev_key, (int)strlen(dev_key));
+    if (nk_db_open("nemunoki_pc_encrypted.db", dev_key, (int)strlen(dev_key)) != SQLITE_OK) {
+        SDL_Log("Cannot open the encrypted PC development database");
+        SDL_Quit();
+        return 1;
+    }
     nk_data_consent_init();
 
     s_window = SDL_CreateWindow("nemunoki", WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+    s_window = SDL_CreateWindow("nemunoki - Onboarding (UX-1)", NK_PC_WINDOW_WIDTH,
+                                NK_PC_WINDOW_HEIGHT, 0);
     s_renderer = SDL_CreateRenderer(s_window, NULL);
     s_texture = SDL_CreateTexture(s_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-                                  WINDOW_WIDTH, WINDOW_HEIGHT);
+                                  NK_PC_WINDOW_WIDTH, NK_PC_WINDOW_HEIGHT);
+
+    uint32_t clear_pixels[NK_PC_WINDOW_WIDTH * NK_PC_WINDOW_HEIGHT];
+    for (int i = 0; i < NK_PC_WINDOW_WIDTH * NK_PC_WINDOW_HEIGHT; i++) {
+        clear_pixels[i] = 0xFFFFFFFF;
+    }
+    SDL_UpdateTexture(s_texture, NULL, clear_pixels, NK_PC_WINDOW_WIDTH * 4);
 
     lv_init();
 
-    static uint32_t buf[WINDOW_WIDTH * 40];
-    s_disp = lv_display_create(WINDOW_WIDTH, WINDOW_HEIGHT);
+    static uint32_t buf[NK_PC_WINDOW_WIDTH * 40];
+    s_disp = lv_display_create(NK_PC_WINDOW_WIDTH, NK_PC_WINDOW_HEIGHT);
+    lv_obj_t *idle_screen = lv_display_get_screen_active(s_disp);
     lv_display_set_color_format(s_disp, LV_COLOR_FORMAT_ARGB8888);
     lv_display_set_buffers(s_disp, buf, NULL, sizeof(buf), LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_flush_cb(s_disp, flush_cb);
@@ -159,11 +182,13 @@ int main(int argc, char *argv[]) {
         SDL_Delay(5);
     }
 
+    lv_screen_load(idle_screen);
     nk_ui_agreement_destroy();
     nk_ui_permissions_destroy();
     nk_ui_privacy_destroy();
     nk_ui_deinit();
     nk_theme_deinit();
+    lv_display_delete(s_disp);
     nk_ui_font_deinit();
     if (s_font_data != NULL) {
         SDL_free(s_font_data);

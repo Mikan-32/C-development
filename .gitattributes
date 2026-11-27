@@ -13,6 +13,7 @@
 *.otf binary
 *.wav binary
 *.jar binary
+*.bin binary
 
 # テストデータ（録音・センサーログ）は Git LFS で管理する
 tests/data/**/*.wav filter=lfs diff=lfs merge=lfs -text
