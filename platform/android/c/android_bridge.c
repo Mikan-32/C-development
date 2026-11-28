@@ -1,12 +1,14 @@
 #include "android_bridge.h"
 
 #include "android_accel.h"
+#include "curtain.h"
 
 #include <SDL3/SDL_system.h>
 #include <android/log.h>
 #include <jni.h>
 #include <stdatomic.h>
 #include <stdbool.h>
+#include <time.h>
 
 #define NK_BRIDGE_TAG "NkAndroid"
 
@@ -15,10 +17,36 @@ typedef struct nk_android_bridge_cache {
     jmethodID db_key;
     jmethodID night_start;
     jmethodID night_stop;
+    jmethodID schedule_fn;
+    jmethodID cancel_fn;
 } nk_android_bridge_cache;
 
 static nk_android_bridge_cache bridge;
 static atomic_int night_state = NK_ANDROID_NIGHT_STOPPED;
+
+static void sync_curtain_schedule_to_android(const nk_curtain_schedule *sched) {
+    if (sched == NULL) {
+        return;
+    }
+    int64_t now_ms = (int64_t)time(NULL) * 1000LL;
+    if (sched->open_enabled) {
+        int64_t next_ms =
+            nk_curtain_next_trigger_ms(sched->open_hour, sched->open_min, sched->repeat, now_ms);
+        (void)nk_android_bridge_schedule_curtain(NK_CURTAIN_SCHED_ID_OPEN, next_ms, 1, 20000,
+                                                 "カーテンを開けます", "予約時刻です");
+    } else {
+        (void)nk_android_bridge_cancel_curtain(NK_CURTAIN_SCHED_ID_OPEN);
+    }
+
+    if (sched->close_enabled) {
+        int64_t next_ms =
+            nk_curtain_next_trigger_ms(sched->close_hour, sched->close_min, sched->repeat, now_ms);
+        (void)nk_android_bridge_schedule_curtain(NK_CURTAIN_SCHED_ID_CLOSE, next_ms, 2, 20000,
+                                                 "カーテンを閉めます", "予約時刻です");
+    } else {
+        (void)nk_android_bridge_cancel_curtain(NK_CURTAIN_SCHED_ID_CLOSE);
+    }
+}
 
 static bool clear_exception(JNIEnv *env, const char *operation) {
     if ((*env)->ExceptionCheck(env)) {
@@ -63,7 +91,17 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
     if (bridge.night_stop == NULL) {
         goto failed;
     }
+    bridge.schedule_fn = (*env)->GetStaticMethodID(env, bridge.bridge_class, "schedule",
+                                                   "(IJIIILjava/lang/String;Ljava/lang/String;)Z");
+    if (bridge.schedule_fn == NULL) {
+        goto failed;
+    }
+    bridge.cancel_fn = (*env)->GetStaticMethodID(env, bridge.bridge_class, "cancel", "(I)V");
+    if (bridge.cancel_fn == NULL) {
+        goto failed;
+    }
 
+    nk_curtain_set_platform_scheduler(sync_curtain_schedule_to_android);
     (void)__android_log_print(ANDROID_LOG_INFO, NK_BRIDGE_TAG, "NativeBridge ready");
     return JNI_VERSION_1_6;
 
@@ -258,6 +296,56 @@ nk_result nk_android_bridge_notifications_allowed(int *out_allowed) {
     return NK_OK;
 }
 
+nk_result nk_android_bridge_schedule_curtain(int schedule_id, int64_t at_ms, int kind,
+                                             int timeout_ms, const char *title, const char *body) {
+    JNIEnv *env;
+    jstring j_title = NULL;
+    jstring j_body = NULL;
+    jboolean ok;
+    nk_result result = NK_ERROR_IO;
+
+    if (title == NULL || body == NULL) {
+        return NK_ERROR_ARGUMENT;
+    }
+    env = current_env();
+    if (env == NULL) {
+        return NK_ERROR_IO;
+    }
+
+    j_title = (*env)->NewStringUTF(env, title);
+    if (clear_exception(env, "schedule title") || j_title == NULL) {
+        goto cleanup;
+    }
+    j_body = (*env)->NewStringUTF(env, body);
+    if (clear_exception(env, "schedule body") || j_body == NULL) {
+        goto cleanup;
+    }
+    ok = (*env)->CallStaticBooleanMethod(env, bridge.bridge_class, bridge.schedule_fn,
+                                         (jint)schedule_id, (jlong)at_ms, (jint)kind, (jint)0,
+                                         (jint)timeout_ms, j_title, j_body);
+    if (!clear_exception(env, "schedule") && ok == JNI_TRUE) {
+        result = NK_OK;
+    }
+
+cleanup:
+    if (j_body != NULL) {
+        (*env)->DeleteLocalRef(env, j_body);
+    }
+    if (j_title != NULL) {
+        (*env)->DeleteLocalRef(env, j_title);
+    }
+    return result;
+}
+
+nk_result nk_android_bridge_cancel_curtain(int schedule_id) {
+    JNIEnv *env = current_env();
+    if (env == NULL) {
+        return NK_ERROR_IO;
+    }
+    (*env)->CallStaticVoidMethod(env, bridge.bridge_class, bridge.cancel_fn, (jint)schedule_id);
+    return clear_exception(env, "cancel") ? NK_ERROR_IO : NK_OK;
+}
+
 JNIEXPORT void JNICALL Java_io_github_mikan32_nemunoki_platform_NativeBridge_nativeOnNightService(
     JNIEnv *env, jclass bridge_class, jint state);
 
@@ -277,6 +365,39 @@ JNIEXPORT void JNICALL Java_io_github_mikan32_nemunoki_platform_NativeBridge_nat
     }
     (void)__android_log_print(ANDROID_LOG_INFO, NK_BRIDGE_TAG, "Night service state: %s",
                               names[state]);
+}
+
+JNIEXPORT void JNICALL Java_io_github_mikan32_nemunoki_platform_NativeBridge_nativeOnScheduled(
+    JNIEnv *env, jclass bridge_class, jint id, jint kind, jint timeout_ms);
+
+JNIEXPORT void JNICALL Java_io_github_mikan32_nemunoki_platform_NativeBridge_nativeOnScheduled(
+    JNIEnv *env, jclass bridge_class, jint id, jint kind, jint timeout_ms) {
+    (void)env;
+    (void)bridge_class;
+    (void)id;
+
+    /* NativeBridge.SCHED_CURTAIN_OPEN = 1, SCHED_CURTAIN_CLOSE = 2 */
+    if (kind == 1 || kind == 2) {
+        bool open_action = (kind == 1);
+        time_t now = time(NULL);
+        struct tm tm_val;
+        (void)localtime_r(&now, &tm_val);
+        bool is_weekday = (tm_val.tm_wday >= 1 && tm_val.tm_wday <= 5);
+
+        (void)nk_curtain_init();
+        if (timeout_ms > 0 && timeout_ms < 45000) {
+            nk_curtain_set_timing_ms(2000, timeout_ms / 2, 3000, 5000);
+        }
+        nk_result rc = nk_curtain_execute_scheduled(open_action, is_weekday);
+        (void)__android_log_print(rc == NK_OK ? ANDROID_LOG_INFO : ANDROID_LOG_WARN, NK_BRIDGE_TAG,
+                                  "Scheduled curtain action (open=%d) result=%d",
+                                  open_action ? 1 : 0, (int)rc);
+
+        /* 次回の予約を翌日に再登録する */
+        nk_curtain_snapshot snap;
+        nk_curtain_get_snapshot(&snap);
+        sync_curtain_schedule_to_android(&snap.schedule);
+    }
 }
 
 JNIEXPORT void JNICALL

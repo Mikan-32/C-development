@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "sqlcipher": {
-    "version": "4.19.0",
-    "commit": "c4b275a47932888216bade83aff2bbc73df0ff85"
+    "version": "4.20.0",
+    "commit": "355d4db92d3404e71faa8088d071a71d767807f4"
   },
   "openssl": {
     "version": "3.5.9",

@@ -50,6 +50,7 @@ static int tab_of(nk_ui_screen screen) {
         return 2;
     case NK_UI_SETTINGS:
     case NK_UI_BEDROOM:
+    case NK_UI_CURTAIN_CONNECT:
         return 3;
     default:
         return 1;
@@ -69,7 +70,7 @@ static void update_tabs(void) {
 void nk_ui_open(nk_ui_screen screen) {
     static void (*const k_build[NK_UI_SCREEN_COUNT])(lv_obj_t *) = {
         nk_build_home,  nk_build_record_day, nk_build_record_week, nk_build_record_detail,
-        nk_build_night, nk_build_settings,   nk_build_bedroom,
+        nk_build_night, nk_build_settings,   nk_build_bedroom,     nk_build_curtain_connect,
     };
     if ((int)screen < 0 || (int)screen >= (int)NK_UI_SCREEN_COUNT || s_ui.page == NULL) {
         return;
@@ -88,6 +89,10 @@ nk_ui_screen nk_ui_current(void) {
 bool nk_ui_back(void) {
     if (s_ui.current == NK_UI_RECORD_DETAIL) {
         nk_ui_open(NK_UI_RECORD_DAY);
+        return true;
+    }
+    if (s_ui.current == NK_UI_CURTAIN_CONNECT) {
+        nk_ui_open(NK_UI_BEDROOM);
         return true;
     }
     if (s_ui.current == NK_UI_BEDROOM) {

@@ -53,6 +53,32 @@ endif()
 # 外部ライブラリ（third_party に submodule を追加したら有効にする）
 # 注意点は third_party/README.md を参照
 # ------------------------------------------------------------------
+find_package(OpenSSL QUIET)
+find_package(CURL QUIET)
+if(NOT CURL_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/third_party/curl/CMakeLists.txt")
+    set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    set(ENABLE_CURL_MANUAL OFF CACHE BOOL "" FORCE)
+    set(BUILD_LIBCURL_DOCS OFF CACHE BOOL "" FORCE)
+    set(BUILD_MISC_DOCS OFF CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+    set(HTTP_ONLY ON CACHE BOOL "" FORCE)
+    set(CURL_USE_LIBPSL OFF CACHE BOOL "" FORCE)
+    set(CURL_USE_LIBSSH2 OFF CACHE BOOL "" FORCE)
+    set(USE_LIBIDN2 OFF CACHE BOOL "" FORCE)
+    set(USE_NGHTTP2 OFF CACHE BOOL "" FORCE)
+    set(CURL_BROTLI OFF CACHE BOOL "" FORCE)
+    set(CURL_ZSTD OFF CACHE BOOL "" FORCE)
+    set(CURL_ZLIB OFF CACHE BOOL "" FORCE)
+    if(WIN32 AND NOT OpenSSL_FOUND)
+        set(CURL_USE_SCHANNEL ON CACHE BOOL "" FORCE)
+    elseif(OpenSSL_FOUND)
+        set(CURL_USE_OPENSSL ON CACHE BOOL "" FORCE)
+    endif()
+    add_subdirectory(third_party/curl EXCLUDE_FROM_ALL SYSTEM)
+endif()
+
 # 画面（SDL3＋LVGL）は、まず PC 版で動かす。
 # Android 版への組み込みは、android/ の Gradle プロジェクトを作るときに行う（SDL3 は共有ライブラリにする）
 if(NOT ANDROID AND NK_BUILD_PC_UI)
@@ -111,6 +137,8 @@ endif()
 add_subdirectory(src/common)
 # data：データベース（SQLite）と同意・睡眠記録。画面を使わないので Android 版でもビルドする
 add_subdirectory(src/data)
+add_subdirectory(src/curtain_api)
+add_subdirectory(src/curtain)
 add_subdirectory(src/sensing)
 add_subdirectory(src/session)
 if(NOT ANDROID AND NK_BUILD_PC_UI)
@@ -149,6 +177,8 @@ if(ANDROID)
     target_link_libraries(main PRIVATE
         SDL3::SDL3
         nk_data
+        nk_curtain
+        nk_curtain_api
         nk_session
         nk_sensing
         nk_options

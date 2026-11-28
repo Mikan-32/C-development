@@ -74,5 +74,6 @@ void nk_build_record_detail(lv_obj_t *page);
 void nk_build_night(lv_obj_t *page);
 void nk_build_settings(lv_obj_t *page);
 void nk_build_bedroom(lv_obj_t *page);
+void nk_build_curtain_connect(lv_obj_t *page);
 
 #endif /* NK_UI_INTERNAL_H */

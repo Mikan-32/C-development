@@ -8,7 +8,7 @@ endif()
 if(NK_BUILD_PC_UI)
 # ui：すべての画面を、ウィンドウなしで作って描けるか（落ちないか）と、戻る先を確かめる
 add_executable(test_ui_screens unit/ui/test_ui_screens.c)
-target_link_libraries(test_ui_screens PRIVATE nk_ui nk_unity nk_options)
+target_link_libraries(test_ui_screens PRIVATE nk_ui nk_curtain nk_unity nk_options)
 add_test(NAME ui.screens COMMAND test_ui_screens)
 
 # ui：同意画面（ON-02）と権限画面（ON-03）の操作と表示
@@ -37,6 +37,7 @@ nk_add_core_test(nk_sqlcipher_check unit/sqlcipher_check.c sqlcipher_check nk_da
 nk_add_core_test(nk_data_check unit/data_check.c data_encryption nk_data)
 nk_add_core_test(nk_session_check unit/session_check.c session_consent nk_session)
 nk_add_core_test(nk_session_unity_check unit/session_unity_check.c session_unity nk_session)
+nk_add_core_test(test_curtain unit/test_curtain.c curtain.unit nk_curtain nk_curtain_api nk_data)
 nk_add_core_test(test_sensing_replay test_sensing_replay.c sensing_replay nk_replay)
 set_tests_properties(sensing_replay PROPERTIES WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 nk_add_core_test(nk_wav_reader_check unit/wav_reader_check.c wav_reader nk_replay)
